@@ -46,16 +46,14 @@ The toolkit includes base container images to simplify application containerizat
 
 ### Deploy Your Application
 
-In the `terraform` folder, find examples for deploying container-enabled CVMs using public cloud confidential offerings like GCP and Azure.
-
-### Bootstrap Your Application
-
-Use the `aapp-toolkit-cli` to connect to deployed application instance, perform remote attestation, and bootstrap them with your aApp manifest created using `sops`:
+In the `terraform` folder, find examples for deploying container-enabled CVMs using public cloud confidential offerings like GCP and Azure. Then create your aApp manifest using `sops` and pass it as metadata to you CVM deployment script:
 
 ```yaml
 apiVersion: alpha.aapp-toolkit.io/v1
 kind: Application
 spec:
+  container:
+    image: your-autonomous-app/awesomeapp:v1
   dns:
     zone: '*.your-autonomous-app.cloud'
     provider: 
@@ -84,8 +82,12 @@ spec:
                 port:
                   number: 8080
 sops:
-# Negotiated SOPS metadata
+# Metadata of your sops setup
 ```
+
+### Bootstrap Your Application
+
+Use the `aapp-toolkit-cli` to connect to deployed application instance, perform remote attestation, validate manifest and bootstrap it by passing encryption keys used in your `sops` setup.
 
 ### Test Your Application
 
