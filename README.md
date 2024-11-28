@@ -109,7 +109,7 @@ The **aApp Toolkit** follows the sidecar design pattern. Services are delivered 
   aApp instances are discovered both publicly and privately via DNS. During the initial bootstrapping, the app takes ownership of a DNS zone used for public and private communications.
 
 - **P2P Bootstrapping**  
-  The first instance is bootstrapped by the developer upon remote attestation. Subsequent instances are self-bootstrapped after mutual attestation. This process configures proxies and seeds initial secrets, ensuring traceability in the certificate-issuing process via a public transparency log.
+  The first instance is bootstrapped by the developer following a remote attestation process. The toolkit provides a minimal bootstrapping workflow that can be extended or integrated into a broader governance and transparency framework based on your application's or network's specific requirements. Subsequent instances are self-bootstrapped through mutual attestation. This process configures proxies, seeds initial secrets, and ensures traceability in the certificate-issuing process using a publicly auditable transparency log. 
 
 - **High Availability**  
   Multiple aApp instances form a network, actively monitoring application state and reporting to service discovery components.
