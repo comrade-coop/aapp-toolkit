@@ -76,7 +76,7 @@ spec:
      rules:
       - http:
           paths:
-          - path: "/api"
+          - path: "/api-internal"
             backend:
               service:
                 port:
