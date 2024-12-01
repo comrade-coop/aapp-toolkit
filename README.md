@@ -117,7 +117,7 @@ The **aApp Toolkit** follows the sidecar design pattern. Services are delivered 
   Multiple aApp instances form a network, actively monitoring application state and reporting to service discovery components.
 
 ## 🏗️ Acknowledgements
-We would like to express our gratitude to the [Constellation project](https://github.com/edgelesssys/constellation) for providing the build infrastructure used to create container-enabled confidential images. Their contributions have been invaluable in advancing secure and efficient TEE application development.
+We would like to express our gratitude to the [Constellation project](https://github.com/edgelesssys/constellation) for providing the build infrastructure used to create container-enabled confidential images and for their robust aTLS library, which powers the secure bootstrapping logic of the toolkit. Their contributions have been invaluable in advancing the development of secure and efficient TEE-based applications.
 
 ## 🤝 Contributing
 
