@@ -5,6 +5,9 @@ The **aApp Toolkit** is a comprehensive set of tools designed to simplify buildi
 
 [![Discord](https://img.shields.io/badge/DISCORD-COMMUNITY-informational?style=for-the-badge&logo=discord)](https://discord.gg/fWwMSZdBF2)
 
+## ⚠️ Disclaimer
+This repository is currently under active development as we restructure and consolidate code from our other projects. Until the first alpha release is tagged, the main codebase may be unstable and subject to frequent changes. We recommend waiting for the first tagged release for a more stable version of the toolkit.
+
 ## 🚀 Features
 
 - **Container-based Application Packaging**  
