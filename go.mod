@@ -1,4 +1,4 @@
-module github.com/yourusername/bootstrapper
+module github.com/comrade-coop/aapp-toolkit/bootstrapper
 
 go 1.23.2
 
