@@ -42,7 +42,7 @@ Ensure the following tools are installed:
 
 ### Containerize Your Application
 
-The toolkit includes base container images to simplify application containerization. Choose from pre-built images or create a tailored one.
+Package your application as a container image and publish it to a container registry. For open-source applications, consider using a reproducible container build process to enhance transparency and build trust with end users.
 
 ### Deploy Your Application
 
@@ -115,6 +115,9 @@ The **aApp Toolkit** follows the sidecar design pattern. Services are delivered 
 
 - **High Availability**  
   Multiple aApp instances form a network, actively monitoring application state and reporting to service discovery components.
+
+## 🏗️ Acknowledgements
+We would like to express our gratitude to the [Constellation project](https://github.com/edgelesssys/constellation) for providing the build infrastructure used to create container-enabled confidential images. Their contributions have been invaluable in advancing secure and efficient TEE application development.
 
 ## 🤝 Contributing
 
