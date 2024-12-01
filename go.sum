@@ -1,0 +1,5 @@
+github.com/edgelesssys/constellation/v2 v2.19.3 h1:TWS0KLDPZRqZatBFX9yneCo3sZsv1phdVuOWbeZ3qWc=
+github.com/edgelesssys/constellation/v2 v2.19.3/go.mod h1:kNvnb4nK+WPT9oyqFEwuMmiihYRQBkidfMf4DOcEmb8=
+github.com/gorilla/mux v1.8.1/go.mod h1:AKf9I4AEqPTmMytcMc0KkNouC66V3BtZ4qD5fmWSiMQ=
+golang.org/x/crypto v0.28.0 h1:GBDwsMXVQi34v5CCYUm2jkJvu4cbtru2U4TN2PSyQnw=
+golang.org/x/crypto v0.28.0/go.mod h1:rmgy+3RHxRZMyY0jjAJShp2zgEdOqj2AO7U0pYmeQ7U=
