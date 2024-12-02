@@ -250,8 +250,8 @@ github.com/coredns/corefile-migration v1.0.23/go.mod h1:8HyMhuyzx9RLZp8cRc9Uf3EC
 github.com/cpuguy83/go-md2man/v2 v2.0.3/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
-github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
-github.com/creack/pty v1.1.18/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
+github.com/creack/pty v1.1.21 h1:1/QdRyBaHHJP61QkWMXlOIBfsgdDeeKfK8SYVUWJKf0=
+github.com/creack/pty v1.1.21/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
 github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7 h1:vU+EP9ZuFUCYE0NYLwTSob+3LNEJATzNfP/DC7SWGWI=
 github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7/go.mod h1:uzvlm1mxhHkdfqitSA92i7Se+S9ksOn3a3qmv/kyOCw=
 github.com/cyphar/filepath-securejoin v0.3.1 h1:1V7cHiaW+C+39wEfpH6XlLBQo3j/PciWFrgfCLS8XrE=
@@ -317,6 +317,8 @@ github.com/fatih/color v1.17.0/go.mod h1:YZ7TlrGPkiz6ku9fK3TLD/pl3CpsiFyu8N92HLg
 github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568/go.mod h1:xEzjJPgXI435gkrCt3MPfRiAkVrwSbHsst4LCFVfpJc=
+github.com/foxboron/go-uefi v0.0.0-20240805124652-e2076f0e58ca h1:ErxkaWK5AIt8gQf3KpAuQQBdZI4ps72HzEe123kh+So=
+github.com/foxboron/go-uefi v0.0.0-20240805124652-e2076f0e58ca/go.mod h1:ffg/fkDeOYicEQLoO2yFFGt00KUTYVXI+rfnc8il6vQ=
 github.com/foxcpp/go-mockdns v1.1.0 h1:jI0rD8M0wuYAxL7r/ynTrCQQq0BVqfB99Vgk7DlmewI=
 github.com/foxcpp/go-mockdns v1.1.0/go.mod h1:IhLeSFGed3mJIAXPH2aiRQB+kqz7oqu8ld2qVbOu7Wk=
 github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHkI4W8=
@@ -850,6 +852,8 @@ go.mongodb.org/mongo-driver v1.14.0 h1:P98w8egYRjYe3XDjxhYJagTokP/H6HzlsnojRgZRd
 go.mongodb.org/mongo-driver v1.14.0/go.mod h1:Vzb0Mk/pa7e6cWw85R4F/endUC3u0U9jGcNU603k65c=
 go.mozilla.org/gopgagent v0.0.0-20170926210634-4d7ea76ff71a h1:N7VD+PwpJME2ZfQT8+ejxwA4Ow10IkGbU0MGf94ll8k=
 go.mozilla.org/gopgagent v0.0.0-20170926210634-4d7ea76ff71a/go.mod h1:YDKUvO0b//78PaaEro6CAPH6NqohCmL2Cwju5XI2HoE=
+go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 h1:A/5uWzF44DlIgdm/PQFwfMkW0JX+cIcQi/SwLAmZP5M=
+go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1/go.mod h1:SNgMg+EgDFwmvSmLRTNKC5fegJjB7v23qTQ0XLGUNHk=
 go.mozilla.org/sops/v3 v3.7.3 h1:CYx02LnWTATWv6NqWJIt4JCKVKSnGV+MsRiDpvwWQhg=
 go.mozilla.org/sops/v3 v3.7.3/go.mod h1:AutdccISG5Nt/faUigaKPU9aGmhyZuCyUiSx5YCa1O8=
 go.opencensus.io v0.24.0 h1:y73uSU6J157QMP2kn2r30vwW1A2W2WFwSCGnAVxeaD0=

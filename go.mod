@@ -33,6 +33,7 @@ require (
 	github.com/edgelesssys/constellation/v2 v2.19.3
 	github.com/edgelesssys/go-azguestattestation v0.0.0-20240513062303-05f8770a633d
 	github.com/edgelesssys/go-tdx-qpl v0.0.0-20240123150912-dcad3c41ec5f
+	github.com/foxboron/go-uefi v0.0.0-20240805124652-e2076f0e58ca
 	github.com/getsops/sops/v3 v3.9.1
 	github.com/go-acme/lego/v4 v4.20.4
 	github.com/go-playground/locales v0.14.1
@@ -82,6 +83,7 @@ require (
 	golang.org/x/mod v0.21.0
 	golang.org/x/net v0.31.0
 	golang.org/x/sys v0.27.0
+	golang.org/x/text v0.20.0
 	golang.org/x/tools v0.26.0
 	google.golang.org/api v0.204.0
 	google.golang.org/grpc v1.67.1
@@ -327,7 +329,6 @@ require (
 	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/sync v0.9.0 // indirect
 	golang.org/x/term v0.26.0 // indirect
-	golang.org/x/text v0.20.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 	google.golang.org/genproto v0.0.0-20241021214115-324edc3d5d38 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241015192408-796eee8c2d53 // indirect

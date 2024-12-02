@@ -1,16 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"strings"
-	"time"
 
-	"github.com/go-acme/lego/v4/certificate"
-	"github.com/go-acme/lego/v4/challenge/dns01"
-	"github.com/go-acme/lego/v4/lego"
-	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
-	"github.com/go-acme/lego/v4/registration"
+	"your-repo-path/mesh/pkg/certmanager"
+	"your-repo-path/mesh/pkg/proxy"
 	"go.mozilla.org/sops/v3/decrypt"
 	"gopkg.in/yaml.v3"
 )
@@ -20,6 +15,9 @@ type Manifest struct {
 	APIVersion string `yaml:"apiVersion"`
 	Kind       string `yaml:"kind"`
 	Spec       struct {
+		Container struct {
+			Image string `yaml:"image"`
+		} `yaml:"container"`
 		DNS struct {
 			Zone     string `yaml:"zone"`
 			Provider struct {
@@ -30,25 +28,41 @@ type Manifest struct {
 				} `yaml:"env"`
 			} `yaml:"provider"`
 		} `yaml:"dns"`
+		Ingress struct {
+			Rules []struct {
+				HTTP struct {
+					Paths []struct {
+						Path    string `yaml:"path"`
+						Backend struct {
+							Service struct {
+								Port struct {
+									Number int `yaml:"number"`
+								} `yaml:"port"`
+							} `yaml:"service"`
+						} `yaml:"backend"`
+					} `yaml:"paths"`
+				} `yaml:"http"`
+			} `yaml:"rules"`
+		} `yaml:"ingress"`
+		MTLSIngress struct {
+			Rules []struct {
+				HTTP struct {
+					Paths []struct {
+						Path    string `yaml:"path"`
+						Backend struct {
+							Service struct {
+								Port struct {
+									Number int `yaml:"number"`
+								} `yaml:"port"`
+							} `yaml:"service"`
+						} `yaml:"backend"`
+					} `yaml:"paths"`
+				} `yaml:"http"`
+			} `yaml:"rules"`
+		} `yaml:"mtlsIngress"`
 	} `yaml:"spec"`
 }
 
-// User implements acme.User
-type User struct {
-	Email        string
-	Registration *registration.Resource
-	key          []byte
-}
-
-func (u *User) GetEmail() string {
-	return u.Email
-}
-func (u *User) GetRegistration() *registration.Resource {
-	return u.Registration
-}
-func (u *User) GetPrivateKey() []byte {
-	return u.key
-}
 
 func main() {
 	// Path to the encrypted manifest
@@ -69,7 +83,7 @@ func main() {
 	// Extract domain from zone (remove wildcard if present)
 	domain := strings.TrimPrefix(manifest.Spec.DNS.Zone, "*.")
 	
-	// Configure Cloudflare DNS provider
+	// Get Cloudflare credentials
 	var cfAPIKey, cfEmail string
 	for _, env := range manifest.Spec.DNS.Provider.Env {
 		switch env.Name {
@@ -80,50 +94,47 @@ func main() {
 		}
 	}
 
-	config := cloudflare.NewDefaultConfig()
-	config.AuthToken = cfAPIKey
-	config.AuthEmail = cfEmail
+	// Get certificate
+	certConfig := certmanager.Config{
+		Domain:   domain,
+		APIKey:   cfAPIKey,
+		APIEmail: cfEmail,
+	}
 	
-	provider, err := cloudflare.NewDNSProviderConfig(config)
-	if err != nil {
-		log.Fatalf("Failed to create Cloudflare provider: %v", err)
-	}
-
-	// Create user
-	myUser := &User{
-		Email: cfEmail,
-		key:   []byte("dummy-key"), // In production, use proper key management
-	}
-
-	// Create config for Let's Encrypt
-	config := lego.NewConfig(myUser)
-	config.CADirURL = lego.LEDirectoryProduction // or lego.LEDirectoryStaging for testing
-
-	// Create client
-	client, err := lego.NewClient(config)
-	if err != nil {
-		log.Fatalf("Failed to create client: %v", err)
-	}
-
-	// Set DNS provider
-	client.Challenge.SetDNS01Provider(provider,
-		dns01.AddRecursiveNameservers([]string{"1.1.1.1:53"}),
-		dns01.DisableCompletePropagationRequirement())
-
-	// Request certificate
-	request := certificate.ObtainRequest{
-		Domains: []string{"*." + domain},
-		Bundle:  true,
-	}
-
-	certificates, err := client.Certificate.Obtain(request)
+	certificates, err := certmanager.ObtainCertificate(certConfig)
 	if err != nil {
 		log.Fatalf("Failed to obtain certificate: %v", err)
 	}
 
-	log.Printf("Successfully obtained certificate for %s", domain)
-	log.Printf("Certificate valid until: %s", certificates.NotAfter.Format(time.RFC3339))
+	// Prepare proxy rules
+	var rules, mtlsRules []proxy.IngressRule
+	
+	for _, rule := range manifest.Spec.Ingress.Rules {
+		for _, path := range rule.HTTP.Paths {
+			rules = append(rules, proxy.IngressRule{
+				Path: path.Path,
+				Port: path.Backend.Service.Port.Number,
+			})
+		}
+	}
 
-	// Keep the service running
-	select {}
+	for _, rule := range manifest.Spec.MTLSIngress.Rules {
+		for _, path := range rule.HTTP.Paths {
+			mtlsRules = append(mtlsRules, proxy.IngressRule{
+				Path: path.Path,
+				Port: path.Backend.Service.Port.Number,
+			})
+		}
+	}
+
+	// Start proxy
+	proxyConfig := proxy.Config{
+		Certificates: certificates,
+		Rules:       rules,
+		MTLSRules:   mtlsRules,
+	}
+
+	if err := proxy.StartProxy(proxyConfig); err != nil {
+		log.Fatalf("Proxy server failed: %v", err)
+	}
 }
