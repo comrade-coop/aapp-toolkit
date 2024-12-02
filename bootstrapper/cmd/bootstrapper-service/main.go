@@ -129,8 +129,17 @@ func main() {
             return
         }
 
+        // Validate the imported key can decrypt SOPS-encrypted manifest
+        cmd = exec.Command("sops", "--decrypt", "/etc/aapp-toolkit/aap-manifest.yaml")
+        output, err := cmd.CombinedOutput()
+        if err != nil {
+            log.Printf("SOPS validation failed: %v\nOutput: %s", err, output)
+            http.Error(w, "Invalid GPG key - cannot decrypt manifest", http.StatusBadRequest)
+            return
+        }
+
         w.WriteHeader(http.StatusOK)
-        fmt.Fprintf(w, "GPG key imported successfully")
+        fmt.Fprintf(w, "GPG key imported and validated successfully")
         }
     })
     
