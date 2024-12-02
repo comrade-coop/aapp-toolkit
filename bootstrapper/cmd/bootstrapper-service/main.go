@@ -2,7 +2,6 @@ package main
 
 import (
     "context"
-    "crypto/sha256"
     "crypto/tls"
     "encoding/json"
     "fmt"
@@ -12,11 +11,18 @@ import (
     "net/http"
     "os/exec"
     
+    "github.com/edgelesssys/constellation/v2/image/measured-boot/measure"
     "github.com/edgelesssys/constellation/v2/internal/atls"
     "github.com/gorilla/mux"
 )
 
 func main() {
+    // Get measurements file path from environment
+    measurementsPath := os.Getenv("MEASUREMENTS_FILE")
+    if measurementsPath == "" {
+        measurementsPath = "/pcrs.json" // default path
+    }
+
     // Initialize ATLS issuer
     issuer, err := atls.NewIssuer()
     if err != nil {
@@ -49,24 +55,19 @@ func main() {
     r.HandleFunc("/init", func(w http.ResponseWriter, r *http.Request) {
         switch r.Method {
         case http.MethodGet:
-            // Read manifest file
-            manifestData, err := ioutil.ReadFile("/etc/aapp-toolkit/aapp-manifest.yaml")
+            // Read measurements from file
+            measurementsData, err := ioutil.ReadFile(measurementsPath)
             if err != nil {
-                log.Printf("Failed to read manifest file: %v", err)
-                http.Error(w, "Failed to read manifest", http.StatusInternalServerError)
+                log.Printf("Failed to read measurements file: %v", err)
+                http.Error(w, "Failed to read measurements", http.StatusInternalServerError)
                 return
             }
 
-            // Calculate manifest hash
-            manifestHash := fmt.Sprintf("%x", sha256.Sum256(manifestData))
-
-            // In a real implementation, these would be read from the TPM
-            // For now, using placeholder values
-            measurements := Measurements{
-                PCR0:        "0000000000000000000000000000000000000000000000000000000000000000",
-                PCR1:        "0000000000000000000000000000000000000000000000000000000000000001",
-                PCR2:        "0000000000000000000000000000000000000000000000000000000000000002",
-                ManifestHash: manifestHash,
+            var measurements Measurements
+            if err := json.Unmarshal(measurementsData, &measurements); err != nil {
+                log.Printf("Failed to parse measurements: %v", err)
+                http.Error(w, "Failed to parse measurements", http.StatusInternalServerError)
+                return
             }
 
             w.Header().Set("Content-Type", "application/json")
