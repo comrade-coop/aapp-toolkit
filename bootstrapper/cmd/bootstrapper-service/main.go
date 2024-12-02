@@ -10,6 +10,8 @@ import (
     "log"
     "net/http"
     "os/exec"
+    "crypto/sha256"
+    "encoding/hex"
     
     "github.com/edgelesssys/constellation/v2/image/measured-boot/measure"
     "github.com/edgelesssys/constellation/v2/internal/atls"
@@ -69,6 +71,19 @@ func main() {
                 http.Error(w, "Failed to parse measurements", http.StatusInternalServerError)
                 return
             }
+
+            // Read and hash the AAP manifest
+            manifestData, err := ioutil.ReadFile("/etc/aapp-toolkit/aap-manifest.yaml")
+            if err != nil {
+                log.Printf("Failed to read AAP manifest: %v", err)
+                http.Error(w, "Failed to read AAP manifest", http.StatusInternalServerError)
+                return
+            }
+
+            // Calculate SHA-256 hash of manifest
+            hasher := sha256.New()
+            hasher.Write(manifestData)
+            measurements.ManifestHash = hex.EncodeToString(hasher.Sum(nil))
 
             w.Header().Set("Content-Type", "application/json")
             json.NewEncoder(w).Encode(measurements)
