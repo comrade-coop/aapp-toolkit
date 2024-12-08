@@ -114,6 +114,7 @@ func main() {
 			rules = append(rules, proxy.IngressRule{
 				Path: path.Path,
 				Port: path.Backend.Service.Port.Number,
+				IsMTLS: false,
 			})
 		}
 	}
@@ -123,6 +124,7 @@ func main() {
 			mtlsRules = append(mtlsRules, proxy.IngressRule{
 				Path: path.Path,
 				Port: path.Backend.Service.Port.Number,
+				IsMTLS: true,
 			})
 		}
 	}

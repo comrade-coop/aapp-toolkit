@@ -7,14 +7,17 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/go-acme/lego/v4/certificate"
 )
 
 // IngressRule represents a routing rule
 type IngressRule struct {
-	Path string
-	Port int
+	Path     string
+	Port     int
+	IsMTLS   bool
+	Location string // The backend location after stripping prefix
 }
 
 // Config holds the configuration for the proxy
@@ -24,7 +27,7 @@ type Config struct {
 	MTLSRules    []IngressRule
 }
 
-// StartProxy initializes and starts the reverse proxy servers
+// StartProxy initializes and starts the reverse proxy server
 func StartProxy(config Config) error {
 	// Create TLS config
 	cert, err := tls.X509KeyPair(config.Certificates.Certificate, config.Certificates.PrivateKey)
@@ -35,34 +38,62 @@ func StartProxy(config Config) error {
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		MinVersion:  tls.VersionTLS12,
+		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+			// Check if the request path starts with /mtls/
+			if strings.HasPrefix(hello.ServerName, "mtls.") {
+				mtlsConfig := tlsConfig.Clone()
+				mtlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+				return mtlsConfig, nil
+			}
+			return tlsConfig, nil
+		},
 	}
 
-	// Create proxy handlers
-	proxyHandler := createProxyHandler(config.Rules)
-	mtlsHandler := createProxyHandler(config.MTLSRules)
+	// Combine all rules
+	allRules := append([]IngressRule{}, config.Rules...)
+	for _, rule := range config.MTLSRules {
+		rule.IsMTLS = true
+		allRules = append(allRules, rule)
+	}
 
-	// Start regular HTTPS server
-	go func() {
-		server := &http.Server{
-			Addr:      ":443",
-			Handler:   proxyHandler,
-			TLSConfig: tlsConfig,
-		}
-		log.Printf("Starting HTTPS server on :443")
-		if err := server.ListenAndServeTLS("", ""); err != nil {
-			log.Printf("HTTPS server failed: %v", err)
-		}
-	}()
+	// Create handler
+	handler := createProxyHandler(allRules)
 
-	// Start mTLS HTTPS server
-	mtlsConfig := tlsConfig.Clone()
-	mtlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+	// Wrap with mTLS check middleware
+	combinedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Find matching rule
+		var matchingRule *IngressRule
+		for _, rule := range allRules {
+			if strings.HasPrefix(r.URL.Path, rule.Path) {
+				matchingRule = &rule
+				break
+			}
+		}
+
+		if matchingRule == nil {
+			http.Error(w, "Path not found", http.StatusNotFound)
+			return
+		}
+
+		// Check mTLS requirements
+		if matchingRule.IsMTLS {
+			if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+				http.Error(w, "Client certificate required", http.StatusUnauthorized)
+				return
+			}
+		}
+
+		handler.ServeHTTP(w, r)
+	})
+
+	// Start HTTPS server
 	server := &http.Server{
-		Addr:      ":8443",
-		Handler:   mtlsHandler,
-		TLSConfig: mtlsConfig,
+		Addr:      ":443",
+		Handler:   combinedHandler,
+		TLSConfig: tlsConfig,
 	}
-	log.Printf("Starting mTLS HTTPS server on :8443")
+	
+	log.Printf("Starting HTTPS server on :443 (TLS and mTLS enabled)")
 	return server.ListenAndServeTLS("", "")
 }
 
@@ -70,6 +101,7 @@ func createProxyHandler(rules []IngressRule) http.Handler {
 	mux := http.NewServeMux()
 	
 	for _, rule := range rules {
+		rule := rule // Create new variable for closure
 		targetURL, err := url.Parse(fmt.Sprintf("http://localhost:%d", rule.Port))
 		if err != nil {
 			log.Printf("Failed to parse target URL for path %s: %v", rule.Path, err)
@@ -77,8 +109,21 @@ func createProxyHandler(rules []IngressRule) http.Handler {
 		}
 
 		proxy := httputil.NewSingleHostReverseProxy(targetURL)
+		
+		// Modify the director to handle path rewriting
+		originalDirector := proxy.Director
+		proxy.Director = func(req *http.Request) {
+			originalDirector(req)
+			// Strip the prefix path and append any remaining path
+			req.URL.Path = strings.TrimPrefix(req.URL.Path, rule.Path)
+			if req.URL.Path == "" {
+				req.URL.Path = "/"
+			}
+		}
+
 		mux.HandleFunc(rule.Path, proxy.ServeHTTP)
-		log.Printf("Set up proxy for path: %s -> %s", rule.Path, targetURL.String())
+		log.Printf("Set up proxy for path: %s -> http://localhost:%d (mTLS: %v)", 
+			rule.Path, rule.Port, rule.IsMTLS)
 	}
 
 	return mux
