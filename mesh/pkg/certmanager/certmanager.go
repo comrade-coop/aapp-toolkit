@@ -31,9 +31,10 @@ func (u *User) GetPrivateKey() []byte {
 
 // Config holds the configuration for certificate management
 type Config struct {
-	Domain   string
-	APIKey   string
-	APIEmail string
+	Domain    string
+	APIKey    string
+	APIEmail  string
+	UserKey   []byte // Private key for ACME user
 }
 
 // ObtainCertificate gets a certificate from Let's Encrypt using DNS challenge
@@ -51,7 +52,7 @@ func ObtainCertificate(config Config) (*certificate.Resource, error) {
 	// Create user
 	myUser := &User{
 		Email: config.APIEmail,
-		key:   []byte("dummy-key"), // In production, use proper key management
+		key:   config.UserKey,
 	}
 
 	// Create config for Let's Encrypt

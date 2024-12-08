@@ -27,6 +27,7 @@ type Manifest struct {
 					Value string `yaml:"value"`
 				} `yaml:"env"`
 			} `yaml:"provider"`
+			UserKey string `yaml:"userKey"` // ACME user private key
 		} `yaml:"dns"`
 		Ingress struct {
 			Rules []struct {
@@ -96,9 +97,10 @@ func main() {
 
 	// Get certificate
 	certConfig := certmanager.Config{
-		Domain:   domain,
-		APIKey:   cfAPIKey,
-		APIEmail: cfEmail,
+		Domain:    domain,
+		APIKey:    cfAPIKey,
+		APIEmail:  cfEmail,
+		UserKey:   []byte(manifest.Spec.DNS.UserKey),
 	}
 	
 	certificates, err := certmanager.ObtainCertificate(certConfig)
