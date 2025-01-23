@@ -1,0 +1,28 @@
+[package]
+name = "tdx"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "tdx"
+crate-type = ["rlib", "cdylib"]
+
+[features]
+clib = ["dep:once_cell"]
+
+[build-dependencies]
+cbindgen = "0.24.0"
+
+[profile.release]
+lto = true
+
+[dependencies]
+coco-provider.workspace = true
+dcap-rs.workspace = true
+rand.workspace = true
+ureq.workspace = true
+base64-url.workspace = true
+serde.workspace = true
+hex.workspace = true
+
+once_cell = { version = "1.19.0", optional = true }
