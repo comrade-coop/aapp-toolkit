@@ -110,11 +110,11 @@ The **aApp Toolkit** follows the sidecar design pattern. Services are delivered 
 
 ### Core Concepts
 
-- **DNS-Based Attested Service Discovery**  
-  aApp instances are discovered both publicly and privately via DNS. During the initial bootstrapping, the app takes ownership of a DNS zone used for public and private communications.
-
 - **P2P Bootstrapping**  
   The first instance is bootstrapped by the developer following a remote attestation process. The toolkit provides a minimal bootstrapping workflow that can be extended or integrated into a broader governance and transparency framework based on your application's or network's specific requirements. Subsequent instances are self-bootstrapped through mutual attestation. This process configures proxies, seeds initial secrets, and ensures traceability in the certificate-issuing process using a publicly auditable transparency log. 
+
+- **DNS-Based Attested Service Discovery**  
+  aApp instances are discoverable both publicly and privately using DNS. During the initial bootstrapping process, the application assumes ownership of a DNS zone, enabling seamless public and private communication. This DNS ownership plays a crucial role in facilitating the certificate issuance process during peer-to-peer (P2P) bootstrapping. Depending on the specific use case and the applicable governance and transparency framework, the DNS zone can be managed using blockchain technology through on-chain attestation. This approach ensures trust and accountability in the DNS zone's management. For more details, refer to the [On-Chain Attestation documentation](docs/ONCHAINATTESTATION.md).
 
 - **High Availability**  
   Multiple aApp instances form a network, actively monitoring application state and reporting to service discovery components.
