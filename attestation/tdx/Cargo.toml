@@ -24,5 +24,8 @@ ureq.workspace = true
 base64-url.workspace = true
 serde.workspace = true
 hex.workspace = true
+ethers.workspace = true
+tokio.workspace = true
+eyre.workspace = true
 
 once_cell = { version = "1.19.0", optional = true }

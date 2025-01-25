@@ -1,0 +1,24 @@
+[package]
+name = "coco-provider"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+default = ["configfs", "legacy", "tpm"]
+tpm = ["dep:tss-esapi"]
+configfs = []
+legacy = []
+
+[dependencies]
+rand.workspace = true
+log.workspace = true
+serde.workspace = true
+serde-big-array.workspace = true
+bincode.workspace = true
+sysinfo.workspace = true
+sev.workspace = true
+users.workspace = true
+
+tss-esapi = { version = "7.2", optional = true }
