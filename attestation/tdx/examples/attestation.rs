@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD as base64, Engine};
 use dcap_rs::types::quotes::version_4::QuoteV4;
 use ethers::{
     prelude::*,
@@ -5,6 +6,7 @@ use ethers::{
     types::Bytes,
 };
 use std::env;
+use tdx::device::DeviceOptions;
 use std::sync::Arc;
 use tdx::Tdx;
 
@@ -22,11 +24,28 @@ async fn main() -> eyre::Result<()> {
     let contract_address = env::var("CONTRACT_ADDRESS")
         .expect("Environment variable CONTRACT_ADDRESS must be set");
 
+    // Read base64 encoded report data from environment variable
+    let report_data_b64 = env::var("REPORT_DATA")
+        .expect("Environment variable REPORT_DATA must be set");
+    
+    // Decode base64 report data
+    let report_data = base64.decode(report_data_b64)
+        .expect("Failed to decode base64 REPORT_DATA");
+    
+    if report_data.len() != 64 {
+        panic!("REPORT_DATA must be exactly 64 bytes when decoded");
+    }
+
+    // Create device options with the report data
+    let options = DeviceOptions {
+        report_data: Some(report_data),
+    };
+
     // Initialise a TDX object
     let tdx = Tdx::new();
 
-    // Retrieve an attestation report with default options passed to the hardware device
-    let raw_report = tdx.get_attestation_report_raw().unwrap();
+    // Retrieve an attestation report with the provided report data
+    let raw_report = tdx.get_attestation_report_raw_with_options(options).unwrap();
     let report = QuoteV4::from_bytes(&raw_report);
     println!(
         "Attestation Report raw bytes: 0x{}",
