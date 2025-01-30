@@ -1,0 +1,16 @@
+[package]
+name = "tdx-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+hex = "0.4"
+tdx = { path = "../tdx" }
+sha2 = "0.10"
+base64 = "0.21"
