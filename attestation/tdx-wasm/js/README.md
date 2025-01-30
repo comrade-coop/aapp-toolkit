@@ -59,7 +59,7 @@ The `decodeQuote()` method returns a JSON object with the following structure:
 - `report_body`: Contains the core attestation measurements and data
 - `signature`: The cryptographic signature of the quote
 - `dns_report_data`: Additional DNS-related data embedded in the quote
-  - `ipv4_address`: The IPv4 address associated with the attestation
+  - `ipv4_address`: The IPv4 address of the instance
   - `dns_challenge`: A challenge string for DNS verification
   - `public_key_fingerprint`: Fingerprint of the associated public key
 
