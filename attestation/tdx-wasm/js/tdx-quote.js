@@ -5,7 +5,10 @@ class TdxQuote {
 
     async initialize() {
         if (!this.wasm) {
-            this.wasm = await import('../pkg/tdx_wasm.js');
+            const wasmUrl = new URL('../pkg/tdx_wasm_bg.wasm', import.meta.url);
+            const wasmModule = await import('../pkg/tdx_wasm.js');
+            await wasmModule.default(wasmUrl);
+            this.wasm = wasmModule;
         }
     }
 
