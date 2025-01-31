@@ -1,8 +1,10 @@
 use wasm_bindgen::prelude::*;
-use tdx::QuoteV4;
+use dcap_rs::types::quotes::version_4::QuoteV4;
+use dcap_rs::types::quotes::body::QuoteBody;
 use serde::Serialize;
 use sha2::{Sha256, Digest};
 use std::net::Ipv4Addr;
+use base64::{engine::general_purpose, Engine as _};
 
 #[derive(Serialize)]
 struct DNSReportData {
@@ -12,7 +14,7 @@ struct DNSReportData {
 }
 
 impl DNSReportData {
-    fn from_report_data(report_data: &[u8]) -> Self {
+    fn from_report_data(report_data: &[u8; 64]) -> Self {
         // First 16 bytes: take last 4 for IPv4
         let ipv4_bytes: [u8; 4] = report_data[12..16].try_into().unwrap();
         let ipv4 = Ipv4Addr::from(ipv4_bytes);
@@ -22,7 +24,7 @@ impl DNSReportData {
         let mut hasher = Sha256::new();
         hasher.update(challenge_input);
         let hash_result = hasher.finalize();
-        let dns_challenge = base64::encode_config(&hash_result, base64::URL_SAFE_NO_PAD);
+        let dns_challenge = general_purpose::URL_SAFE_NO_PAD.encode(&hash_result);
 
         // Last 32 bytes for public key fingerprint
         let fingerprint = hex::encode(&report_data[32..64]);
@@ -38,7 +40,6 @@ impl DNSReportData {
 #[derive(Serialize)]
 struct AttestedDNSQuoteV4 {
     #[serde(flatten)]
-    quote: QuoteV4,
     unpacked_report_data: DNSReportData,
 }
 
@@ -52,12 +53,12 @@ pub fn decode_quote_v4(hex_quote: &str) -> Result<JsValue, JsError> {
     let quote = QuoteV4::from_bytes(&quote_bytes);
     
     // Get report data and create unpacked version
-    let report_data = quote.report_body.report_data.as_bytes();
-    let dns_report_data = DNSReportData::from_report_data(report_data);
+    let QuoteBody::TD10QuoteBody(td10_report) = quote.quote_body else { todo!() };
+    let report_data = td10_report.report_data;
+    let dns_report_data = DNSReportData::from_report_data(&report_data);
     
     // Create attested DNS quote
     let attested_quote = AttestedDNSQuoteV4 {
-        quote,
         unpacked_report_data: dns_report_data,
     };
     

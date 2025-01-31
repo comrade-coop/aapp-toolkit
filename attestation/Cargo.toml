@@ -2,7 +2,8 @@
 resolver = "2"
 members = [
     "crates/*",
-    "tdx"
+    "tdx",
+    "tdx-wasm"
 ]
 exclude = [
     "clis/dcap-bonsai-cli",
