@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JWT Token Validator</title>
+    <script type="module">
+        import { jwtVerify } from 'https://cdn.skypack.dev/jose';
+
+        const jwtToken = "MAS_JWT_TOKEN"; // Replace with an actual JWT token
+
+        function decodeJwtHeader(token) {
+            try {
+                const [header] = token.split(".");
+                return JSON.parse(atob(header));
+            } catch (error) {
+                console.error("Error decoding JWT header:", error);
+                throw new Error("Invalid JWT header");
+            }
+        }
+
+        async function fetchPublicKey(jku, kid) {
+            try {
+                const response = await fetch(jku);
+                const { keys } = await response.json();
+                const keyData = keys.find(k => k.kid === kid);
+                if (!keyData) throw new Error("Matching public key not found");
+
+                return await crypto.subtle.importKey(
+                    "jwk", 
+                    keyData, 
+                    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+                    false, 
+                    ["verify"]
+                );
+            } catch (error) {
+                console.error("Error fetching public key:", error);
+                throw error;
+            }
+        }
+
+        async function validateJWT() {
+            try {
+                const header = decodeJwtHeader(jwtToken);
+                if (!header.jku || !header.kid) throw new Error("Missing jku or kid in token header");
+
+                const key = await fetchPublicKey(header.jku, header.kid);
+                const { payload } = await jwtVerify(jwtToken, key);
+                displayClaims(payload, true);
+            } catch (error) {
+                document.getElementById('output').innerText = "Invalid Token";
+                console.error("JWT Validation Error:", error);
+            }
+        }
+
+        function decodeXMsRuntime(encodedData) {
+            const hexString = atob(encodedData);
+            const bytes = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+
+            const ipv4 = `${bytes[12]}.${bytes[13]}.${bytes[14]}.${bytes[15]}`;
+            const randomToken = [...bytes.slice(16, 32)].map(b => b.toString(16).padStart(2, '0')).join('');
+            const certFingerprint = [...bytes.slice(32, 64)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+            document.getElementById('decoded-nonce-output').innerHTML = `
+                <div><strong>IPv4 Address:</strong> ${ipv4}</div>
+                <div><strong>Random Token:</strong> ${randomToken}</div>
+                <div><strong>Certificate Fingerprint:</strong> ${certFingerprint}</div>
+            `;
+        }
+
+        function displayClaims(claims, isValid) {
+            const outputDiv = document.getElementById('output');
+            outputDiv.innerHTML = "";
+            
+            const validityMessage = document.createElement("div");
+            validityMessage.innerText = isValid ? "Signature is valid" : "Signature is invalid";
+            outputDiv.appendChild(validityMessage);
+            
+            for (const [key, value] of Object.entries(claims)) {
+                const claimElement = document.createElement("div");
+                claimElement.innerHTML = `<strong>${key}:</strong> ${typeof value === 'object' ? JSON.stringify(value) : value}`;
+                outputDiv.appendChild(claimElement);
+
+                if (key === "x-ms-runtime" && value["client-payload"]?.nonce) {
+                    decodeXMsRuntime(value["client-payload"].nonce);
+                }
+            }
+        }
+
+        window.onload = validateJWT;
+    </script>
+</head>
+<body>
+    <div>
+        <h1>JWT Token Claims</h1>
+        <div id="output"></div>
+        <hr></hr>
+        <h4>x-ms-runtime.client-payload.nonce (decoded)</h1>
+        <div id="decoded-nonce-output"></div>
+    </div>
+</body>
+</html>
+
