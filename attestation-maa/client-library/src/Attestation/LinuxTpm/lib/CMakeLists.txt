@@ -1,0 +1,29 @@
+cmake_minimum_required (VERSION 3.5)
+
+set (CMAKE_PROJECT_TARGET Tpm2)
+project (Linux${CMAKE_PROJECT_TARGET})
+
+find_package(Tss2 REQUIRED)
+include_directories(${TSS2_INCLUDE_DIRS})
+
+find_path(CRYPTO_INCLUDE_DIR NAMES openssl PATHS /usr/local/attestationssl/include
+                                            NO_DEFAULT_PATH)
+
+include_directories (${CMAKE_CURRENT_SOURCE_DIR}/../include
+                    ${CRYPTO_INCLUDE_DIR}
+)
+
+file(GLOB SOURCES "*.cpp")
+
+find_library(CRYPTO_LIB NAMES crypto PATHS /usr/local/attestationssl/lib64
+                                           NO_DEFAULT_PATH)
+find_library(SSL_LIB NAMES ssl PATHS /usr/local/attestationssl/lib64
+                                           NO_DEFAULT_PATH)
+
+add_library(${CMAKE_PROJECT_TARGET} ${SOURCES})
+target_link_libraries(${CMAKE_PROJECT_TARGET} ${TSS2_LIBRARIES})
+target_link_libraries(${CMAKE_PROJECT_TARGET} ${CRYPTO_LIB})
+target_link_libraries(${CMAKE_PROJECT_TARGET} ${SSL_LIB})
+target_link_libraries(${CMAKE_PROJECT_TARGET} pthread)
+target_link_libraries(${CMAKE_PROJECT_TARGET} dl)
+set_property(TARGET ${CMAKE_PROJECT_TARGET} PROPERTY POSITION_INDEPENDENT_CODE ON)
