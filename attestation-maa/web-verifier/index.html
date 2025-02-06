@@ -53,7 +53,7 @@
             }
         }
 
-        function decodeXMsRuntime(encodedData) {
+        function decodeXMsRuntime(encodedData, outputElement) {
             const hexString = atob(encodedData);
             const bytes = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
@@ -61,42 +61,581 @@
             const randomToken = [...bytes.slice(16, 32)].map(b => b.toString(16).padStart(2, '0')).join('');
             const certFingerprint = [...bytes.slice(32, 64)].map(b => b.toString(16).padStart(2, '0')).join('');
 
-            document.getElementById('decoded-nonce-output').innerHTML = `
+            outputElement.innerHTML = `
                 <div><strong>IPv4 Address:</strong> ${ipv4}</div>
                 <div><strong>Random Token:</strong> ${randomToken}</div>
                 <div><strong>Certificate Fingerprint:</strong> ${certFingerprint}</div>
             `;
         }
 
+        function formatTimestamp(unixTimestamp) {
+            const date = new Date(unixTimestamp * 1000);
+            return date.toLocaleString();
+        }
+
+        function createSecurityBadge(value) {
+            const elem = document.createElement('span');
+            elem.className = `security-status ${value ? 'valid' : 'invalid'}`;
+            elem.innerText = value ? 'ENABLED' : 'DISABLED';
+            return elem;
+        }
+
+        function formatValue(value, key) {
+            if (typeof value === 'boolean') {
+                return `<span class="bool-value ${value ? 'bool-true' : 'bool-false'}">${value}</span>`;
+            }
+            if (typeof value === 'string' && value.match(/^[0-9a-f]{32,}$/i)) {
+                return `<span class="hex-value">${value}</span>`;
+            }
+            if (key.toLowerCase().includes('measurement') || key.toLowerCase().includes('digest')) {
+                return `<span class="hex-value">${value}</span>`;
+            }
+            return value;
+        }
+
+        function formatNestedObject(data, level = 0, labelMapping = {}) {
+            const container = document.createElement('div');
+            container.className = 'nested-object';
+            
+            for (const [key, value] of Object.entries(data)) {
+                const row = document.createElement('div');
+                row.className = 'claim-group';
+                row.style.marginLeft = `${level * 20}px`;
+                
+                const mapping = labelMapping[key] || {};
+                const label = mapping.label || key;
+                const description = mapping.description || '';
+                
+                if (key === 'keys' && Array.isArray(value)) {
+                    const headerDiv = document.createElement('div');
+                    headerDiv.className = 'nested-header';
+                    headerDiv.innerHTML = `<strong>${label}</strong>`;
+                    if (description) {
+                        headerDiv.innerHTML += `<div class="description">${description}</div>`;
+                    }
+                    row.appendChild(headerDiv);
+
+                    value.forEach((keyObj, index) => {
+                        const keyDiv = document.createElement('div');
+                        keyDiv.className = 'key-info';
+                        keyDiv.innerHTML = `<div class="key-info-header">Key ${index + 1}</div>`;
+                        
+                        for (const [keyProp, keyValue] of Object.entries(keyObj)) {
+                            const propLabel = mapping.nested?.[keyProp]?.label || keyProp;
+                            const itemDiv = document.createElement('div');
+                            itemDiv.className = 'key-info-item';
+                            
+                            if (keyProp === 'n' || keyValue.length > 50) {
+                                itemDiv.innerHTML = `
+                                    <span class="key-info-label">${propLabel}:</span>
+                                    <div class="hex-value" onclick="this.classList.toggle('expanded')">${keyValue}</div>
+                                `;
+                            } else if (Array.isArray(keyValue)) {
+                                itemDiv.innerHTML = `
+                                    <span class="key-info-label">${propLabel}:</span>
+                                    <span>${keyValue.join(', ')}</span>
+                                `;
+                            } else {
+                                itemDiv.innerHTML = `
+                                    <span class="key-info-label">${propLabel}:</span>
+                                    <span>${keyValue}</span>
+                                `;
+                            }
+                            keyDiv.appendChild(itemDiv);
+                        }
+                        row.appendChild(keyDiv);
+                    });
+                } else if (typeof value === 'object' && value !== null) {
+                    const headerDiv = document.createElement('div');
+                    headerDiv.className = 'nested-header';
+                    headerDiv.innerHTML = `<strong>${label}</strong>`;
+                    if (description) {
+                        headerDiv.innerHTML += `<div class="description">${description}</div>`;
+                    }
+                    row.appendChild(headerDiv);
+                    
+                    const nestedMapping = mapping.nested || {};
+                    row.appendChild(formatNestedObject(value, level + 1, nestedMapping));
+                } else {
+                    let formattedValue = formatValue(value, key);
+                    if (typeof value === 'boolean') {
+                        formattedValue = createSecurityBadge(value).outerHTML;
+                    }
+                    
+                    row.innerHTML = `
+                        <div>
+                            <strong>${label}:</strong>
+                            <div class="claim-value">${formattedValue}</div>
+                            ${description ? `<div class="description">${description}</div>` : ''}
+                        </div>
+                    `;
+                }
+                
+                container.appendChild(row);
+            }
+            return container;
+        }
+
         function displayClaims(claims, isValid) {
             const outputDiv = document.getElementById('output');
-            outputDiv.innerHTML = "";
-            
-            const validityMessage = document.createElement("div");
-            validityMessage.innerText = isValid ? "Signature is valid" : "Signature is invalid";
-            outputDiv.appendChild(validityMessage);
-            
-            for (const [key, value] of Object.entries(claims)) {
-                const claimElement = document.createElement("div");
-                claimElement.innerHTML = `<strong>${key}:</strong> ${typeof value === 'object' ? JSON.stringify(value) : value}`;
-                outputDiv.appendChild(claimElement);
+            outputDiv.innerHTML = '';
 
-                if (key === "x-ms-runtime" && value["client-payload"]?.nonce) {
-                    decodeXMsRuntime(value["client-payload"].nonce);
+            // Human readable labels for individual claims
+            const humanLabels = {
+                exp: { label: "Expiration Time", description: "The time when the token expires." },
+                iat: { label: "Issued At", description: "The time when the token was issued." },
+                nbf: { label: "Not Valid Before", description: "The token is not valid before this time." },
+                secureboot: { label: "Secure Boot", description: "Indicates whether secure boot is enabled on the VM." },
+                "x-ms-azurevm-attestation-type": { label:"Attestation Type", description:"The type of attestation used for the VM." },
+                "x-ms-azurevm-attestation-protocol-ver": { label:"Attestation Protocol Version", description:"Version of the attestation protocol used." },
+                "x-ms-azurevm-attested-pcrs": { label:"Attested PCRs", description:"List of PCRs (Platform Configuration Registers) attested." },
+                "x-ms-azurevm-bootdebug-enabled": { label:"Boot Debug Enabled", description:"Indicates if boot debugging is enabled on the VM." },
+                "x-ms-azurevm-dbvalidated": { label:"DB Validated", description:"Indicates if the DB component has been validated." },
+                "x-ms-azurevm-dbxvalidated": { label:"DBX Validated", description:"Indicates if the DBX component has been validated." },
+                "x-ms-azurevm-debuggersdisabled": { label:"Debuggers Disabled", description:"Indicates if debuggers are disabled." },
+                "x-ms-azurevm-default-securebootkeysvalidated": { label:"Default Secure Boot Keys Validated", description:"Indicates if default secure boot keys have been validated." },
+                "x-ms-azurevm-elam-enabled": { label:"ELAM Enabled", description:"Indicates if ELAM (Early Launch Anti-Malware) is enabled." },
+                "x-ms-azurevm-flightsigning-enabled": { label:"Flight Signing Enabled", description:"Indicates if flight signing is enabled." },
+                "x-ms-azurevm-hvci-policy": { label:"HVCI Policy", description:"Hypervisor Code Integrity (HVCI) policy value." },
+                "x-ms-azurevm-hypervisordebug-enabled": { label:"Hypervisor Debugging", description:"Indicates if hypervisor debugging is enabled." },
+                "x-ms-azurevm-is-windows": { label:"Operating System", description:"Indicates whether the VM is running Windows (true) or Linux (false)." },
+                "x-ms-azurevm-kerneldebug-enabled": { label:"Kernel Debug Enabled", description:"Indicates if kernel debugging is enabled." },
+                "x-ms-azurevm-osbuild": { label:"OS Build", description:"OS build information." },
+                "x-ms-azurevm-osdistro": { label:"OS Distribution", description:"Name of the OS distribution." },
+                "x-ms-azurevm-ostype": { label:"OS Type", description:"Operating system type." },
+                "x-ms-azurevm-osversion-major": { label:"OS Version (Major)", description:"Major version number of the OS." },
+                "x-ms-azurevm-osversion-minor": { label:"OS Version (Minor)", description:"Minor version number of the OS." },
+                "x-ms-azurevm-signingdisabled": { label:"Signing Disabled", description:"Indicates if secure signing is disabled on the VM." },
+                "x-ms-azurevm-testsigning-enabled": { label:"Test Signing Enabled", description:"Indicates if test signing is enabled." },
+                "x-ms-azurevm-vmid": { label:"VM ID", description:"Unique identifier for the virtual machine." },
+                "x-ms-policy-hash": { label:"Policy Hash", description:"Hash representing the attestation policy configuration." },
+                "x-ms-runtime": { label:"Runtime Information", description:"Attestation runtime­related information." }
+            };
+
+            // Human readable section headings
+            const sectionHeadings = {
+                timestamps: { label: "Time Information", description: "Timestamps related to token validity." },
+                vmConfig: { label: "Virtual Machine Configuration", description: "Configuration information specific to the Azure VM." },
+                isolationTee: { label: "Isolation TEE Data", description: "Detailed data from the Trusted Execution Environment." },
+                runtimeInfo: { label: "Attestation Runtime Information", description: "Runtime properties associated with the attestation." },
+                securityPolicy: { label: "Security Policy", description: "Security settings and policy hash." }
+            };
+
+            const sections = {
+                'timestamps': ['exp', 'iat', 'nbf'],
+                'vmConfig': key => key.startsWith('x-ms-azurevm'),
+                'isolationTee': key => key.startsWith('x-ms-isolation-tee'),
+                'runtimeInfo': key => key.startsWith('x-ms-runtime'),
+                'securityPolicy': ['x-ms-policy-hash', 'secureboot']
+            };
+
+            // Human readable labels specific for Isolation TEE Data
+            const isolationTeeLabels = {
+                "x-ms-attestation-type": { 
+                    label: "Attestation Type", 
+                    description: "The type of isolation used for the virtual machine" 
+                },
+                "x-ms-compliance-status": { 
+                    label: "Compliance Status", 
+                    description: "Compliance status of the virtual machine" 
+                },
+                "x-ms-runtime": {
+                    label: "Runtime Configuration",
+                    description: "Runtime configuration and keys for the TEE environment",
+                    nested: {
+                        "keys": { 
+                            label: "Security Keys", 
+                            description: "Cryptographic keys used in the TEE",
+                            nested: {
+                                "e": { label: "Exponent" },
+                                "key_ops": { label: "Operations" },
+                                "kid": { label: "Key ID" },
+                                "kty": { label: "Key Type" },
+                                "n": { label: "Modulus" }
+                            }
+                        },
+                        "user-data": { 
+                            label: "User Data", 
+                            description: "User-specific data in the TEE" 
+                        },
+                        "vm-configuration": { 
+                            label: "VM Configuration", 
+                            description: "Virtual machine configuration settings",
+                            nested: {
+                                "console-enabled": { 
+                                    label: "Console Enabled", 
+                                    description: "Whether console access is enabled" 
+                                },
+                                "secure-boot": { 
+                                    label: "Secure Boot", 
+                                    description: "Whether secure boot is enabled" 
+                                },
+                                "tpm-enabled": { 
+                                    label: "TPM Enabled", 
+                                    description: "Whether TPM (Trusted Platform Module) is enabled" 
+                                },
+                                "vmUniqueId": { 
+                                    label: "VM Unique ID", 
+                                    description: "Unique identifier for the virtual machine" 
+                                }
+                            }
+                        }
+                    }
+                },
+                "x-ms-sevsnpvm-authorkeydigest": { 
+                    label: "Author Key Digest", 
+                    description: "Cryptographic digest of the attestation author key" 
+                },
+                "x-ms-sevsnpvm-bootloader-svn": { 
+                    label: "Bootloader Version", 
+                    description: "Security Version Number of the bootloader" 
+                },
+                "x-ms-sevsnpvm-familyId": { 
+                    label: "Family ID", 
+                    description: "Identifier for the VM family" 
+                },
+                "x-ms-sevsnpvm-guestsvn": { 
+                    label: "Guest Version", 
+                    description: "Security Version Number of the guest OS" 
+                },
+                "x-ms-sevsnpvm-hostdata": { 
+                    label: "Host Data", 
+                    description: "Data provided by the host system" 
+                },
+                "x-ms-sevsnpvm-idkeydigest": { 
+                    label: "ID Key Digest", 
+                    description: "Cryptographic digest of the identity key" 
+                },
+                "x-ms-sevsnpvm-imageId": { 
+                    label: "Image ID", 
+                    description: "Identifier for the VM image" 
+                },
+                "x-ms-sevsnpvm-is-debuggable": { 
+                    label: "Debug Status", 
+                    description: "Whether the system is in debug mode" 
+                },
+                "x-ms-sevsnpvm-launchmeasurement": { 
+                    label: "Launch Measurement", 
+                    description: "Cryptographic measurement taken at launch time" 
+                },
+                "x-ms-sevsnpvm-microcode-svn": { 
+                    label: "Microcode Version", 
+                    description: "Security Version Number of the CPU microcode" 
+                },
+                "x-ms-sevsnpvm-migration-allowed": { 
+                    label: "Migration Status", 
+                    description: "Whether VM migration is allowed" 
+                },
+                "x-ms-sevsnpvm-reportdata": { 
+                    label: "Report Data", 
+                    description: "Raw attestation report data" 
+                },
+                "x-ms-sevsnpvm-reportid": { 
+                    label: "Report ID", 
+                    description: "Unique identifier for this attestation report" 
+                },
+                "x-ms-sevsnpvm-smt-allowed": { 
+                    label: "SMT Status", 
+                    description: "Whether Simultaneous Multi-Threading is allowed" 
+                },
+                "x-ms-sevsnpvm-snpfw-svn": { 
+                    label: "SNP Firmware Version", 
+                    description: "Security Version Number of the SNP firmware" 
+                },
+                "x-ms-sevsnpvm-tee-svn": { 
+                    label: "TEE Version", 
+                    description: "Security Version Number of the Trusted Execution Environment" 
+                },
+                "x-ms-sevsnpvm-vmpl": { 
+                    label: "VM Privilege Level", 
+                    description: "Current privilege level of the virtual machine" 
                 }
-            }
+            };
+
+            // Create validity banner
+            const validityBanner = document.createElement('div');
+            validityBanner.className = `claim-section ${isValid ? 'valid' : 'invalid'}`;
+            validityBanner.innerHTML = `
+                <h3 style="margin:0">Attestation Result: 
+                    <span class="security-status">${isValid ? 'VALID SIGNATURE' : 'INVALID SIGNATURE'}</span>
+                </h3>
+                <p class="description">This indicates if the token's signature was successfully verified.</p>
+            `;
+            outputDiv.appendChild(validityBanner);
+
+            // Process sections in order
+            Object.entries(sections).forEach(([sectionName, matcher]) => {
+                const sectionClaims = Object.entries(claims).filter(([key]) =>
+                    Array.isArray(matcher) ? matcher.includes(key) : matcher(key)
+                );
+
+                if (sectionClaims.length > 0) {
+                    const section = document.createElement('div');
+                    section.className = 'claim-section';
+                    section.innerHTML = `<h3>${sectionHeadings[sectionName]?.label || sectionName}</h3>
+                    <p class="description">${sectionHeadings[sectionName]?.description || ''}</p>`;
+                    
+                    sectionClaims.forEach(([key, value]) => {
+                        const group = document.createElement('div');
+                        group.className = 'claim-group';
+                        const label = humanLabels[key] ? humanLabels[key].label : key;
+                        const desc = humanLabels[key] ? humanLabels[key].description : '';
+                        
+                        if (key === 'x-ms-azurevm-attested-pcrs' && Array.isArray(value)) {
+                            // Special handling for PCRs list
+                            group.innerHTML = `
+                                <div><strong>${label}:</strong></div>
+                                <div class="pcr-list">
+                                    ${value.map(pcr => `<div class="pcr-item">PCR ${pcr}</div>`).join('')}
+                                </div>
+                            `;
+                        }
+                        else if (['exp', 'iat', 'nbf'].includes(key)) {
+                            group.innerHTML = `<div><strong>${label}:</strong> ${formatTimestamp(value)}</div>`;
+                        } else if (key === 'secureboot') {
+                            group.innerHTML = `<div><strong>${label}:</strong> ${createSecurityBadge(value).outerHTML}</div>`;
+                        } else if (typeof value === 'object') {
+                            group.innerHTML = `<div><strong>${label}:</strong></div>`;
+                            if(sectionName === 'isolationTee') {
+                                // Use isolationTeeLabels for improved readability in Isolation TEE Data section
+                                group.appendChild(formatNestedObject(value, 0, isolationTeeLabels));
+                            } else {
+                                group.appendChild(formatNestedObject(value));
+                            }
+                        } else {
+                            group.innerHTML = `<div><strong>${label}:</strong> ${value}</div>`;
+                        }
+                        if(desc) {
+                            group.innerHTML += `<div class="description">${desc}</div>`;
+                        }
+                        section.appendChild(group);
+                    });
+                    outputDiv.appendChild(section);
+
+                    // Add TLS Certificate immediately after timestamps section
+                    if (sectionName === 'timestamps' && claims['x-ms-runtime']?.['client-payload']?.nonce) {
+                        const tlsSection = document.createElement('div');
+                        tlsSection.className = 'claim-section';
+                        tlsSection.innerHTML = `
+                            <h3>TLS Certificate</h3>
+                            <div class="decoded-tls-output"></div>
+                        `;
+                        
+                        const tlsOutput = tlsSection.querySelector('.decoded-tls-output');
+                        decodeXMsRuntime(claims['x-ms-runtime']['client-payload'].nonce, tlsOutput);
+                        outputDiv.appendChild(tlsSection);
+                    }
+                }
+            });
         }
 
         window.onload = validateJWT;
     </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.5;
+            color: #333;
+            background: #f5f7f9;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        h3 {
+            color: #2c3e50;
+            margin: 0 0 15px 0;
+        }
+
+        .claim-section { 
+            margin: 25px 0; 
+            padding: 20px;
+            background: white;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .claim-group { 
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #f8f9fa;
+        }
+
+        .claim-group:hover {
+            background: #f1f3f5;
+        }
+
+        .nested-object {
+            margin: 10px 0;
+        }
+
+        .timestamp { 
+            color: #666;
+            font-size: 0.9em;
+            font-family: monospace;
+        }
+
+        .security-status { 
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 0.9em;
+            display: inline-block;
+            margin: 3px 0;
+        }
+
+        .valid { 
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .invalid { 
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .monospace { 
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+            font-size: 0.9em;
+            background: #f6f8fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .description {
+            font-size: 0.85em;
+            color: #666;
+            margin: 5px 0;
+            font-style: italic;
+        }
+
+        /* Hex value styling */
+        .hex-value {
+            font-family: monospace;
+            background: #f6f8fa;
+            padding: 3px 6px;
+            border-radius: 3px;
+            border: 1px solid #e1e4e8;
+            word-break: break-all;
+        }
+
+        /* Section header with icon */
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .section-header h3 {
+            margin: 0;
+        }
+
+        /* Value formatting */
+        .claim-value {
+            margin-top: 3px;
+            word-break: break-word;
+        }
+
+        /* Boolean value styling */
+        .bool-value {
+            font-weight: 500;
+        }
+
+        .bool-true {
+            color: #28a745;
+        }
+
+        .bool-false {
+            color: #dc3545;
+        }
+
+        .pcr-list {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .pcr-item {
+            font-family: monospace;
+            padding: 3px 0;
+            color: #2c3e50;
+        }
+
+        .nested-header {
+            margin-bottom: 10px;
+            padding: 5px 0;
+            border-bottom: 1px solid #eaecef;
+        }
+
+        .nested-object .claim-group {
+            background: white;
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+        }
+
+        .nested-object .claim-group:hover {
+            background: #f8f9fa;
+        }
+
+        .claim-value {
+            margin: 5px 0;
+            padding: 5px 0;
+        }
+
+        /* Key information styling */
+        .key-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 5px 0;
+        }
+
+        .key-info-item {
+            font-size: 0.9em;
+            padding: 5px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .key-info .hex-value {
+            font-size: 0.85em;
+            max-height: 2.4em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .key-info .hex-value.expanded {
+            max-height: none;
+        }
+
+        .key-info-label {
+            font-weight: 500;
+            color: #495057;
+            margin-right: 5px;
+        }
+    </style>
 </head>
 <body>
-    <div>
-        <h1>JWT Token Claims</h1>
+    <div class="container">
+        <h1>Azure VM Attestation Report</h1>
         <div id="output"></div>
-        <hr></hr>
-        <h4>x-ms-runtime.client-payload.nonce (decoded)</h1>
-        <div id="decoded-nonce-output"></div>
     </div>
 </body>
 </html>
