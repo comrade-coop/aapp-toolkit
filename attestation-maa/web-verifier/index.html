@@ -27,15 +27,18 @@
                 if (!keyData) throw new Error("Matching public key not found");
 
                 return await crypto.subtle.importKey(
-                    "jwk", 
-                    keyData, 
-                    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-                    false, 
+                    "jwk",
+                    keyData,
+                    {
+                        name: "RSASSA-PKCS1-v1_5",
+                        hash: { name: "SHA-256" }
+                    },
+                    false,
                     ["verify"]
                 );
             } catch (error) {
                 console.error("Error fetching public key:", error);
-                throw error;
+                throw new Error("Failed to import public key");
             }
         }
 
@@ -44,11 +47,31 @@
                 const header = decodeJwtHeader(jwtToken);
                 if (!header.jku || !header.kid) throw new Error("Missing jku or kid in token header");
 
+                if (header.alg !== 'RS256') {
+                    throw new Error(`Unsupported algorithm: ${header.alg}`);
+                }
+
                 const key = await fetchPublicKey(header.jku, header.kid);
-                const { payload } = await jwtVerify(jwtToken, key);
-                displayClaims(payload, true);
+                const { payload, protectedHeader } = await jwtVerify(jwtToken, key, {
+                    algorithms: ['RS256']
+                });
+                
+                const now = Math.floor(Date.now() / 1000);
+                const isExpired = payload.exp < now;
+                displayClaims(payload, {
+                    isValidSignature: true,
+                    isExpired: isExpired
+                });
+                
             } catch (error) {
-                document.getElementById('output').innerText = "Invalid Token";
+                const errorMessage = error.code === 'ERR_JWS_VERIFICATION_FAILED' 
+                    ? "Signature verification failed" 
+                    : error.message;
+                
+                displayClaims(null, {
+                    isValidSignature: false,
+                    errorMessage: `Verification Error: ${errorMessage}`
+                });
                 console.error("JWT Validation Error:", error);
             }
         }
@@ -68,9 +91,66 @@
             `;
         }
 
-        function formatTimestamp(unixTimestamp) {
+        function formatTimestamp(unixTimestamp, claimKey) {
             const date = new Date(unixTimestamp * 1000);
-            return date.toLocaleString();
+            const now = Date.UTC(
+                new Date().getUTCFullYear(),
+                new Date().getUTCMonth(),
+                new Date().getUTCDate(),
+                new Date().getUTCHours(),
+                new Date().getUTCMinutes(),
+                new Date().getUTCSeconds()
+            );
+            const diffSeconds = Math.round((unixTimestamp * 1000 - now) / 1000);
+            
+            // Date formatting options
+            const options = { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric', 
+                hour: 'numeric', 
+                minute: '2-digit', 
+                hour12: true,
+                timeZone: 'UTC',
+                timeZoneName: 'short'
+            };
+            const formattedDate = date.toLocaleString('en-US', options);
+
+            // Calculate time difference
+            const timeUnits = [
+                { unit: 'day', seconds: 86400 },
+                { unit: 'hour', seconds: 3600 },
+                { unit: 'minute', seconds: 60 }
+            ];
+            
+            let relativeTime = '';
+            if (diffSeconds >= 0) {
+                relativeTime = 'in ';
+            } else {
+                relativeTime = 'ago ';
+            }
+            
+            let seconds = Math.abs(diffSeconds);
+            for (const { unit, seconds: unitSeconds } of timeUnits) {
+                const count = Math.floor(seconds / unitSeconds);
+                if (count > 0) {
+                    relativeTime += `${count} ${unit}${count !== 1 ? 's' : ''} `;
+                    seconds %= unitSeconds;
+                }
+            }
+            
+            if (seconds > 0 || relativeTime === '') {
+                relativeTime += `${seconds} second${seconds !== 1 ? 's' : ''}`;
+            }
+            
+            return `
+                <div class="timestamp">
+                    <span class="${claimKey === 'exp' && diffSeconds < 0 ? 'expired' : ''}">
+                        ${formattedDate}
+                    </span>
+                    <span class="relative-time">(${relativeTime})</span>
+                </div>
+            `;
         }
 
         function createSecurityBadge(value) {
@@ -176,9 +256,47 @@
             return container;
         }
 
-        function displayClaims(claims, isValid) {
+        function detectBrowser() {
+            const userAgent = navigator.userAgent;
+            
+            if (userAgent.includes("Firefox")) {
+                return "Firefox";
+            } else if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) {
+                return "Safari";
+            } else if (userAgent.includes("Chrome") || userAgent.includes("Edg")) {
+                return "Chrome";
+            }
+            return "Unknown";
+        }
+
+        function displayClaims(claims, validation) {
             const outputDiv = document.getElementById('output');
             outputDiv.innerHTML = '';
+
+            if (!validation.isValidSignature || validation.errorMessage) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'claim-section invalid';
+                errorDiv.innerHTML = `
+                    <h3 style="margin:0">Attestation Result: 
+                        <span class="security-status">${validation.errorMessage || "Invalid Token Signature"}</span>
+                    </h3>
+                    ${validation.errorMessage ? `<p class="description">${validation.errorMessage}</p>` : ''}
+                `;
+                outputDiv.appendChild(errorDiv);
+                return;
+            }
+
+            // Create validity banner with separate statuses
+            const validityBanner = document.createElement('div');
+            validityBanner.className = `claim-section ${validation.isValidSignature ? 'valid' : 'invalid'}`;
+            validityBanner.innerHTML = `
+                <h3 style="margin:0">Attestation Result: 
+                    <span class="security-status">${validation.isValidSignature ? 'VALID SIGNATURE' : 'INVALID SIGNATURE'}</span>
+                    ${validation.isExpired ? '<span class="security-status expired">(EXPIRED)</span>' : ''}
+                </h3>
+                <p class="description">Signature verification ${validation.isValidSignature ? 'succeeded' : 'failed'}${validation.isExpired ? ' but token has expired' : ''}.</p>
+            `;
+            outputDiv.appendChild(validityBanner);
 
             // Human readable labels for individual claims
             const humanLabels = {
@@ -352,17 +470,6 @@
                 }
             };
 
-            // Create validity banner
-            const validityBanner = document.createElement('div');
-            validityBanner.className = `claim-section ${isValid ? 'valid' : 'invalid'}`;
-            validityBanner.innerHTML = `
-                <h3 style="margin:0">Attestation Result: 
-                    <span class="security-status">${isValid ? 'VALID SIGNATURE' : 'INVALID SIGNATURE'}</span>
-                </h3>
-                <p class="description">This indicates if the token's signature was successfully verified.</p>
-            `;
-            outputDiv.appendChild(validityBanner);
-
             // Process sections in order
             Object.entries(sections).forEach(([sectionName, matcher]) => {
                 const sectionClaims = Object.entries(claims).filter(([key]) =>
@@ -391,7 +498,7 @@
                             `;
                         }
                         else if (['exp', 'iat', 'nbf'].includes(key)) {
-                            group.innerHTML = `<div><strong>${label}:</strong> ${formatTimestamp(value)}</div>`;
+                            group.innerHTML = `<div><strong>${label}:</strong> ${formatTimestamp(value, key)}</div>`;
                         } else if (key === 'secureboot') {
                             group.innerHTML = `<div><strong>${label}:</strong> ${createSecurityBadge(value).outerHTML}</div>`;
                         } else if (typeof value === 'object') {
@@ -416,9 +523,63 @@
                     if (sectionName === 'timestamps' && claims['x-ms-runtime']?.['client-payload']?.nonce) {
                         const tlsSection = document.createElement('div');
                         tlsSection.className = 'claim-section';
+                        const browser = detectBrowser();
+                        
+                        const browserInstructions = {
+                            Chrome: `
+                                <div class="browser-specific">
+                                    <h5>Chrome/Edge Instructions:</h5>
+                                    <ol>
+                                        <li>Click the padlock icon in the address bar</li>
+                                        <li>Click "Connection is secure"</li>
+                                        <li>Click "Certificate is valid"</li>
+                                        <li>Go to "Details" tab</li>
+                                        <li>Find "Thumbprint" or "SHA-1 Fingerprint" field</li>
+                                        <li>Compare it with the Certificate Fingerprint shown above</li>
+                                    </ol>
+                                </div>
+                            `,
+                            Firefox: `
+                                <div class="browser-specific">
+                                    <h5>Firefox Instructions:</h5>
+                                    <ol>
+                                        <li>Click the padlock icon in the address bar</li>
+                                        <li>Click the ">" arrow next to "Connection secure"</li>
+                                        <li>Click "More Information"</li>
+                                        <li>Click "View Certificate"</li>
+                                        <li>Find "Fingerprint (SHA-1)" field</li>
+                                        <li>Compare it with the Certificate Fingerprint shown above</li>
+                                    </ol>
+                                </div>
+                            `,
+                            Safari: `
+                                <div class="browser-specific">
+                                    <h5>Safari Instructions:</h5>
+                                    <ol>
+                                        <li>Click the padlock icon in the address bar</li>
+                                        <li>Click "Show Certificate"</li>
+                                        <li>Expand the certificate details</li>
+                                        <li>Find "SHA-1 Certificate Fingerprint"</li>
+                                        <li>Compare it with the Certificate Fingerprint shown above</li>
+                                    </ol>
+                                </div>
+                            `,
+                            Unknown: `
+                                <div class="browser-specific">
+                                    <h5>Browser Instructions:</h5>
+                                    <p>Please use Chrome, Firefox, or Safari to verify the certificate.</p>
+                                </div>
+                            `
+                        };
+
                         tlsSection.innerHTML = `
                             <h3>TLS Certificate</h3>
                             <div class="decoded-tls-output"></div>
+                            <div class="browser-instructions">
+                                <h4>How to Verify Certificate in Your Browser</h4>
+                                <p>To verify if this certificate matches your current HTTPS connection:</p>
+                                ${browserInstructions[browser]}
+                            </div>
                         `;
                         
                         const tlsOutput = tlsSection.querySelector('.decoded-tls-output');
@@ -483,8 +644,7 @@
 
         .timestamp { 
             color: #666;
-            font-size: 0.9em;
-            font-family: monospace;
+            font-family: inherit;
         }
 
         .security-status { 
@@ -629,6 +789,54 @@
             font-weight: 500;
             color: #495057;
             margin-right: 5px;
+        }
+
+        .browser-instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e1e4e8;
+        }
+
+        .browser-instructions h4 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+        }
+
+        .browser-instructions h5 {
+            margin: 15px 0 10px 0;
+            color: #2c3e50;
+        }
+
+        .browser-specific {
+            margin: 15px 0;
+        }
+
+        .browser-specific ol {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+
+        .browser-specific li {
+            margin: 5px 0;
+            color: #495057;
+        }
+
+        .relative-time {
+            font-size: 0.9em;
+            color: #666;
+            margin-left: 8px;
+            display: inline-block;
+        }
+
+        .expired {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .timestamp {
+            margin: 5px 0;
         }
     </style>
 </head>
