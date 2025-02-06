@@ -162,7 +162,7 @@
 
         function formatValue(value, key) {
             if (typeof value === 'boolean') {
-                return `<span class="bool-value ${value ? 'bool-true' : 'bool-false'}">${value}</span>`;
+                return createSecurityBadge(value).outerHTML;
             }
             if (typeof value === 'string' && value.match(/^[0-9a-f]{32,}$/i)) {
                 return `<span class="hex-value">${value}</span>`;
@@ -201,7 +201,10 @@
                         keyDiv.innerHTML = `<div class="key-info-header">Key ${index + 1}</div>`;
                         
                         for (const [keyProp, keyValue] of Object.entries(keyObj)) {
-                            const propLabel = mapping.nested?.[keyProp]?.label || keyProp;
+                            const propMapping = mapping.nested?.[keyProp] || {};
+                            const propLabel = propMapping.label || keyProp;
+                            const formatFn = propMapping.format || (v => formatValue(v, keyProp));
+                            const formattedValue = formatFn(keyValue);
                             const itemDiv = document.createElement('div');
                             itemDiv.className = 'key-info-item';
                             
@@ -218,7 +221,7 @@
                             } else {
                                 itemDiv.innerHTML = `
                                     <span class="key-info-label">${propLabel}:</span>
-                                    <span>${keyValue}</span>
+                                    <span>${formattedValue}</span>
                                 `;
                             }
                             keyDiv.appendChild(itemDiv);
@@ -307,27 +310,27 @@
                 "x-ms-azurevm-attestation-type": { label:"Attestation Type", description:"The type of attestation used for the VM." },
                 "x-ms-azurevm-attestation-protocol-ver": { label:"Attestation Protocol Version", description:"Version of the attestation protocol used." },
                 "x-ms-azurevm-attested-pcrs": { label:"Attested PCRs", description:"List of PCRs (Platform Configuration Registers) attested." },
-                "x-ms-azurevm-bootdebug-enabled": { label:"Boot Debug Enabled", description:"Indicates if boot debugging is enabled on the VM." },
-                "x-ms-azurevm-dbvalidated": { label:"DB Validated", description:"Indicates if the DB component has been validated." },
-                "x-ms-azurevm-dbxvalidated": { label:"DBX Validated", description:"Indicates if the DBX component has been validated." },
-                "x-ms-azurevm-debuggersdisabled": { label:"Debuggers Disabled", description:"Indicates if debuggers are disabled." },
-                "x-ms-azurevm-default-securebootkeysvalidated": { label:"Default Secure Boot Keys Validated", description:"Indicates if default secure boot keys have been validated." },
-                "x-ms-azurevm-elam-enabled": { label:"ELAM Enabled", description:"Indicates if ELAM (Early Launch Anti-Malware) is enabled." },
-                "x-ms-azurevm-flightsigning-enabled": { label:"Flight Signing Enabled", description:"Indicates if flight signing is enabled." },
+                "x-ms-azurevm-bootdebug-enabled": { label:"Boot Debugging", description:"Indicates if boot debugging is enabled on the VM." },
+                "x-ms-azurevm-dbvalidated": { label:"DB Validation", description:"Indicates if the DB component has been validated." },
+                "x-ms-azurevm-dbxvalidated": { label:"DBX Validation", description:"Indicates if the DBX component has been validated." },
+                "x-ms-azurevm-debuggersdisabled": { label:"Debuggers Status", description:"Indicates if debuggers are disabled." },
+                "x-ms-azurevm-default-securebootkeysvalidated": { label:"Default Secure Boot Keys", description:"Indicates if default secure boot keys have been validated." },
+                "x-ms-azurevm-elam-enabled": { label:"ELAM Protection", description:"Indicates if ELAM (Early Launch Anti-Malware) is enabled." },
+                "x-ms-azurevm-flightsigning-enabled": { label:"Flight Signing", description:"Indicates if flight signing is enabled." },
                 "x-ms-azurevm-hvci-policy": { label:"HVCI Policy", description:"Hypervisor Code Integrity (HVCI) policy value." },
                 "x-ms-azurevm-hypervisordebug-enabled": { label:"Hypervisor Debugging", description:"Indicates if hypervisor debugging is enabled." },
-                "x-ms-azurevm-is-windows": { label:"Operating System", description:"Indicates whether the VM is running Windows (true) or Linux (false)." },
-                "x-ms-azurevm-kerneldebug-enabled": { label:"Kernel Debug Enabled", description:"Indicates if kernel debugging is enabled." },
+                "x-ms-azurevm-is-windows": { label:"Windows OS", description:"Indicates if the virtual machine is running Windows operating system." },
+                "x-ms-azurevm-kerneldebug-enabled": { label:"Kernel Debugging", description:"Indicates if kernel debugging is enabled." },
                 "x-ms-azurevm-osbuild": { label:"OS Build", description:"OS build information." },
                 "x-ms-azurevm-osdistro": { label:"OS Distribution", description:"Name of the OS distribution." },
                 "x-ms-azurevm-ostype": { label:"OS Type", description:"Operating system type." },
                 "x-ms-azurevm-osversion-major": { label:"OS Version (Major)", description:"Major version number of the OS." },
                 "x-ms-azurevm-osversion-minor": { label:"OS Version (Minor)", description:"Minor version number of the OS." },
-                "x-ms-azurevm-signingdisabled": { label:"Signing Disabled", description:"Indicates if secure signing is disabled on the VM." },
-                "x-ms-azurevm-testsigning-enabled": { label:"Test Signing Enabled", description:"Indicates if test signing is enabled." },
+                "x-ms-azurevm-signingdisabled": { label:"Secure Signing", description:"Indicates if secure signing is disabled on the VM." },
+                "x-ms-azurevm-testsigning-enabled": { label:"Test Signing", description:"Indicates if test signing is enabled." },
                 "x-ms-azurevm-vmid": { label:"VM ID", description:"Unique identifier for the virtual machine." },
                 "x-ms-policy-hash": { label:"Policy Hash", description:"Hash representing the attestation policy configuration." },
-                "x-ms-runtime": { label:"Runtime Information", description:"Attestation runtime­related information." }
+                "x-ms-runtime": { label:"Runtime Information", description:"Attestation runtime­-related information." }
             };
 
             // Human readable section headings
@@ -351,11 +354,13 @@
             const isolationTeeLabels = {
                 "x-ms-attestation-type": { 
                     label: "Attestation Type", 
-                    description: "The type of isolation used for the virtual machine" 
+                    description: "The type of isolation used for the virtual machine",
+                    format: value => createSecurityBadge(value).outerHTML
                 },
                 "x-ms-compliance-status": { 
                     label: "Compliance Status", 
-                    description: "Compliance status of the virtual machine" 
+                    description: "Compliance status of the virtual machine",
+                    format: value => createSecurityBadge(value).outerHTML
                 },
                 "x-ms-runtime": {
                     label: "Runtime Configuration",
@@ -365,16 +370,17 @@
                             label: "Security Keys", 
                             description: "Cryptographic keys used in the TEE",
                             nested: {
-                                "e": { label: "Exponent" },
-                                "key_ops": { label: "Operations" },
-                                "kid": { label: "Key ID" },
-                                "kty": { label: "Key Type" },
-                                "n": { label: "Modulus" }
+                                "e": { label: "Exponent", format: value => formatValue(value, 'e') },
+                                "key_ops": { label: "Operations", format: value => formatValue(value, 'key_ops') },
+                                "kid": { label: "Key ID", format: value => formatValue(value, 'kid') },
+                                "kty": { label: "Key Type", format: value => formatValue(value, 'kty') },
+                                "n": { label: "Modulus", format: value => formatValue(value, 'n') }
                             }
                         },
                         "user-data": { 
                             label: "User Data", 
-                            description: "User-specific data in the TEE" 
+                            description: "User-specific data in the TEE",
+                            format: value => formatValue(value, 'user-data')
                         },
                         "vm-configuration": { 
                             label: "VM Configuration", 
@@ -382,19 +388,23 @@
                             nested: {
                                 "console-enabled": { 
                                     label: "Console Enabled", 
-                                    description: "Whether console access is enabled" 
+                                    description: "Whether console access is enabled",
+                                    format: value => createSecurityBadge(value).outerHTML
                                 },
                                 "secure-boot": { 
                                     label: "Secure Boot", 
-                                    description: "Whether secure boot is enabled" 
+                                    description: "Whether secure boot is enabled",
+                                    format: value => createSecurityBadge(value).outerHTML
                                 },
                                 "tpm-enabled": { 
                                     label: "TPM Enabled", 
-                                    description: "Whether TPM (Trusted Platform Module) is enabled" 
+                                    description: "Whether TPM is enabled",
+                                    format: value => createSecurityBadge(value).outerHTML
                                 },
                                 "vmUniqueId": { 
                                     label: "VM Unique ID", 
-                                    description: "Unique identifier for the virtual machine" 
+                                    description: "Unique identifier for the virtual machine",
+                                    format: value => formatValue(value, 'vmUniqueId')
                                 }
                             }
                         }
@@ -402,71 +412,88 @@
                 },
                 "x-ms-sevsnpvm-authorkeydigest": { 
                     label: "Author Key Digest", 
-                    description: "Cryptographic digest of the attestation author key" 
+                    description: "Cryptographic digest of the attestation author key",
+                    format: value => formatValue(value, 'authorkeydigest')
                 },
                 "x-ms-sevsnpvm-bootloader-svn": { 
                     label: "Bootloader Version", 
-                    description: "Security Version Number of the bootloader" 
+                    description: "Security Version Number of the bootloader",
+                    format: value => formatValue(value, 'bootloader-svn')
                 },
                 "x-ms-sevsnpvm-familyId": { 
                     label: "Family ID", 
-                    description: "Identifier for the VM family" 
+                    description: "Identifier for the VM family",
+                    format: value => formatValue(value, 'familyId')
                 },
                 "x-ms-sevsnpvm-guestsvn": { 
                     label: "Guest Version", 
-                    description: "Security Version Number of the guest OS" 
+                    description: "Security Version Number of the guest OS",
+                    format: value => formatValue(value, 'guestsvn')
                 },
                 "x-ms-sevsnpvm-hostdata": { 
                     label: "Host Data", 
-                    description: "Data provided by the host system" 
+                    description: "Data provided by the host system",
+                    format: value => formatValue(value, 'hostdata')
                 },
                 "x-ms-sevsnpvm-idkeydigest": { 
                     label: "ID Key Digest", 
-                    description: "Cryptographic digest of the identity key" 
+                    description: "Cryptographic digest of the identity key",
+                    format: value => formatValue(value, 'idkeydigest')
                 },
                 "x-ms-sevsnpvm-imageId": { 
                     label: "Image ID", 
-                    description: "Identifier for the VM image" 
+                    description: "Identifier for the VM image",
+                    format: value => formatValue(value, 'imageId')
                 },
                 "x-ms-sevsnpvm-is-debuggable": { 
                     label: "Debug Status", 
-                    description: "Whether the system is in debug mode" 
+                    description: "Whether the system is in debug mode",
+                    format: value => createSecurityBadge(value).outerHTML
                 },
                 "x-ms-sevsnpvm-launchmeasurement": { 
                     label: "Launch Measurement", 
-                    description: "Cryptographic measurement taken at launch time" 
+                    description: "Cryptographic measurement taken at launch time",
+                    format: value => formatValue(value, 'launchmeasurement')
                 },
                 "x-ms-sevsnpvm-microcode-svn": { 
                     label: "Microcode Version", 
-                    description: "Security Version Number of the CPU microcode" 
+                    description: "Security Version Number of the CPU microcode",
+                    format: value => formatValue(value, 'microcode-svn')
                 },
                 "x-ms-sevsnpvm-migration-allowed": { 
                     label: "Migration Status", 
-                    description: "Whether VM migration is allowed" 
+                    description: "Whether VM migration is allowed",
+                    format: value => createSecurityBadge(value).outerHTML
                 },
                 "x-ms-sevsnpvm-reportdata": { 
                     label: "Report Data", 
-                    description: "Raw attestation report data" 
+                    description: "Raw attestation report data",
+                    format: value => formatValue(value, 'reportdata')
                 },
                 "x-ms-sevsnpvm-reportid": { 
                     label: "Report ID", 
-                    description: "Unique identifier for this attestation report" 
+                    description: "Unique identifier for this attestation report",
+                    format: value => formatValue(value, 'reportid')
                 },
                 "x-ms-sevsnpvm-smt-allowed": { 
                     label: "SMT Status", 
-                    description: "Whether Simultaneous Multi-Threading is allowed" 
+                    description: "Whether Simultaneous Multi-Threading is allowed",
+                    format: value => createSecurityBadge(value).outerHTML
                 },
                 "x-ms-sevsnpvm-snpfw-svn": { 
                     label: "SNP Firmware Version", 
-                    description: "Security Version Number of the SNP firmware" 
+                    description: "Security Version Number of the SNP firmware",
+                    format: value => formatValue(value, 'snpfw-svn')
                 },
                 "x-ms-sevsnpvm-tee-svn": { 
                     label: "TEE Version", 
-                    description: "Security Version Number of the Trusted Execution Environment" 
+                    description: "Security Version Number of the Trusted Execution Environment",
+                    format: value => formatValue(value, 'tee-svn')
                 },
                 "x-ms-sevsnpvm-vmpl": { 
                     label: "VM Privilege Level", 
-                    description: "Current privilege level of the virtual machine" 
+                    description: "Current privilege level of the virtual machine",
+                    format: value => formatValue(value, 'vmpl')
                 }
             };
 
@@ -510,7 +537,7 @@
                                 group.appendChild(formatNestedObject(value));
                             }
                         } else {
-                            group.innerHTML = `<div><strong>${label}:</strong> ${value}</div>`;
+                            group.innerHTML = `<div><strong>${label}:</strong> ${typeof value === 'boolean' ? createSecurityBadge(value).outerHTML : value}</div>`;
                         }
                         if(desc) {
                             group.innerHTML += `<div class="description">${desc}</div>`;
