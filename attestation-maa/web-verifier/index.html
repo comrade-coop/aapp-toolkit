@@ -122,7 +122,7 @@
         function createSecurityBadge(value) {
             const elem = document.createElement('span');
             elem.className = `security-status ${value ? 'valid' : 'invalid'}`;
-            elem.innerText = value ? 'ENABLED' : 'DISABLED';
+            elem.innerText = value ? 'YES' : 'NO';
             return elem;
         }
 
@@ -274,35 +274,35 @@
                 iat: { label: "Issued At", description: "The time when the token was issued." },
                 nbf: { label: "Not Valid Before", description: "The token is not valid before this time." },
                 secureboot: { label: "Secure Boot", description: "Indicates whether secure boot is enabled on the VM." },
-                "x-ms-azurevm-attestation-type": { label:"Attestation Type", description:"The type of attestation used for the VM." },
-                "x-ms-azurevm-attestation-protocol-ver": { label:"Attestation Protocol Version", description:"Version of the attestation protocol used." },
-                "x-ms-azurevm-attested-pcrs": { label:"Attested PCRs", description:"List of PCRs (Platform Configuration Registers) attested." },
-                "x-ms-azurevm-bootdebug-enabled": { label:"Boot Debugging", description:"Indicates if boot debugging is enabled on the VM." },
-                "x-ms-azurevm-dbvalidated": { label:"DB Validation", description:"Indicates if the DB component has been validated." },
-                "x-ms-azurevm-dbxvalidated": { label:"DBX Validation", description:"Indicates if the DBX component has been validated." },
-                "x-ms-azurevm-debuggersdisabled": { label:"Debuggers Status", description:"Indicates if debuggers are disabled." },
-                "x-ms-azurevm-default-securebootkeysvalidated": { label:"Secure Boot Keys Validated", description:"Indicates if secure boot keys have been validated." },
-                "x-ms-azurevm-elam-enabled": { label:"ELAM Protection", description:"Indicates if ELAM (Early Launch Anti-Malware) is enabled." },
-                "x-ms-azurevm-flightsigning-enabled": { label:"Flight Signing", description:"Indicates if flight signing is enabled." },
-                "x-ms-azurevm-hvci-policy": { label:"HVCI Policy", description:"Hypervisor Code Integrity (HVCI) policy value." },
-                "x-ms-azurevm-hypervisordebug-enabled": { label:"Hypervisor Debugging", description:"Indicates if hypervisor debugging is enabled." },
-                "x-ms-azurevm-is-windows": { label:"Windows OS", description:"Indicates if the virtual machine is running Windows operating system." },
-                "x-ms-azurevm-kerneldebug-enabled": { label:"Kernel Debugging", description:"Indicates if kernel debugging is enabled." },
+                "x-ms-azurevm-vmid": { label:"VM ID", description:"Unique identifier for the virtual machine." },
                 "x-ms-azurevm-osbuild": { label:"OS Build", description:"OS build information." },
                 "x-ms-azurevm-osdistro": { label:"OS Distribution", description:"Name of the OS distribution." },
                 "x-ms-azurevm-ostype": { label:"OS Type", description:"Operating system type." },
                 "x-ms-azurevm-osversion-major": { label:"OS Version (Major)", description:"Major version number of the OS." },
                 "x-ms-azurevm-osversion-minor": { label:"OS Version (Minor)", description:"Minor version number of the OS." },
-                "x-ms-azurevm-signingdisabled": { label:"Secure Signing", description:"Indicates if secure signing is disabled on the VM." },
+                "x-ms-azurevm-is-windows": { label:"Windows OS", description:"Indicates if the virtual machine is running Windows operating system." },
+                "x-ms-azurevm-dbvalidated": { label:"DB Validation", description:"Indicates if the DB component has been validated." },
+                "x-ms-azurevm-dbxvalidated": { label:"DBX Validation", description:"Indicates if the DBX component has been validated." },
+                "x-ms-azurevm-default-securebootkeysvalidated": { label:"Secure Boot Keys Validated", description:"Indicates if secure boot keys have been validated." },
+                "x-ms-azurevm-hypervisordebug-enabled": { label:"Hypervisor Debugging", description:"Indicates if hypervisor debugging is enabled." },
+                "x-ms-azurevm-elam-enabled": { label:"ELAM Protection", description:"Indicates if ELAM (Early Launch Anti-Malware) is enabled." },
+                "x-ms-azurevm-hvci-policy": { label:"HVCI Policy", description:"Hypervisor Code Integrity (HVCI) policy value." },
+                "x-ms-azurevm-bootdebug-enabled": { label:"Boot Debugging", description:"Indicates if boot debugging is enabled on the VM." },
+                "x-ms-azurevm-debuggersdisabled": { label:"Debuggers Disabled", description:"Indicates if debuggers are disabled." },
+                "x-ms-azurevm-kerneldebug-enabled": { label:"Kernel Debugging", description:"Indicates if kernel debugging is enabled." },
+                "x-ms-azurevm-flightsigning-enabled": { label:"Flight Signing", description:"Indicates if flight signing is enabled." },
                 "x-ms-azurevm-testsigning-enabled": { label:"Test Signing", description:"Indicates if test signing is enabled." },
-                "x-ms-azurevm-vmid": { label:"VM ID", description:"Unique identifier for the virtual machine." },
+                "x-ms-azurevm-signingdisabled": { label:"Signing Disabled", description:"Indicates if secure signing is disabled on the VM." },
+                "x-ms-azurevm-attestation-type": { label:"Attestation Type", description:"The type of attestation used for the VM." },
+                "x-ms-azurevm-attestation-protocol-ver": { label:"Attestation Protocol Version", description:"Version of the attestation protocol used." },
+                "x-ms-azurevm-attested-pcrs": { label:"Attested PCRs", description:"List of PCRs (Platform Configuration Registers) attested." },
                 "x-ms-policy-hash": { label:"Policy Hash", description:"Hash representing the attestation policy configuration." },
                 "x-ms-runtime": { label:"Runtime Information", description:"Attestation runtime­-related information." }
             };
 
             // Human readable section headings
             const sectionHeadings = {
-                timestamps: { label: "Time Information", description: "Timestamps related to token validity." },
+                timestamps: { label: "Token Validity", description: "Timestamps related to token validity." },
                 vmConfig: { label: "Virtual Machine Configuration", description: "Configuration information specific to the Azure VM." },
                 isolationTee: { label: "Isolation TEE Data", description: "Detailed data from the Trusted Execution Environment." },
                 runtimeInfo: { label: "Attestation Runtime Information", description: "Runtime properties associated with the attestation." },
@@ -413,7 +413,7 @@
                     format: value => formatValue(value, 'imageId')
                 },
                 "x-ms-sevsnpvm-is-debuggable": { 
-                    label: "Debug Status", 
+                    label: "Debuggable", 
                     description: "Whether the system is in debug mode",
                     format: value => createSecurityBadge(value).outerHTML
                 },
@@ -428,7 +428,7 @@
                     format: value => formatValue(value, 'microcode-svn')
                 },
                 "x-ms-sevsnpvm-migration-allowed": { 
-                    label: "Migration Status", 
+                    label: "Migration Allowed", 
                     description: "Whether VM migration is allowed",
                     format: value => createSecurityBadge(value).outerHTML
                 },
@@ -443,7 +443,7 @@
                     format: value => formatValue(value, 'reportid')
                 },
                 "x-ms-sevsnpvm-smt-allowed": { 
-                    label: "SMT Status", 
+                    label: "SMT Allowed", 
                     description: "Whether Simultaneous Multi-Threading is allowed",
                     format: value => createSecurityBadge(value).outerHTML
                 },
@@ -476,6 +476,15 @@
                     section.innerHTML = `<h3>${sectionHeadings[sectionName]?.label || sectionName}</h3>
                     <p class="description">${sectionHeadings[sectionName]?.description || ''}</p>`;
                     
+                    // For vmConfig section, sort claims according to humanLabels order
+                    if (sectionName === 'vmConfig') {
+                        const sortedClaims = Object.keys(humanLabels)
+                            .filter(key => matcher(key) && sectionClaims.some(([k]) => k === key))
+                            .map(key => sectionClaims.find(([k]) => k === key));
+                        sectionClaims.length = 0;
+                        sectionClaims.push(...sortedClaims);
+                    }
+
                     sectionClaims.forEach(([key, value]) => {
                         const group = document.createElement('div');
                         group.className = 'claim-group';
