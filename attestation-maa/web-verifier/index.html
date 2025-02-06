@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JWT Token Validator</title>
+    <title>Attestation Report</title>
     <script type="module">
         import { jwtVerify } from 'https://cdn.skypack.dev/jose';
 
@@ -39,40 +39,6 @@
             } catch (error) {
                 console.error("Error fetching public key:", error);
                 throw new Error("Failed to import public key");
-            }
-        }
-
-        async function validateJWT() {
-            try {
-                const header = decodeJwtHeader(jwtToken);
-                if (!header.jku || !header.kid) throw new Error("Missing jku or kid in token header");
-
-                if (header.alg !== 'RS256') {
-                    throw new Error(`Unsupported algorithm: ${header.alg}`);
-                }
-
-                const key = await fetchPublicKey(header.jku, header.kid);
-                const { payload, protectedHeader } = await jwtVerify(jwtToken, key, {
-                    algorithms: ['RS256']
-                });
-                
-                const now = Math.floor(Date.now() / 1000);
-                const isExpired = payload.exp < now;
-                displayClaims(payload, {
-                    isValidSignature: true,
-                    isExpired: isExpired
-                });
-                
-            } catch (error) {
-                const errorMessage = error.code === 'ERR_JWS_VERIFICATION_FAILED' 
-                    ? "Signature verification failed" 
-                    : error.message;
-                
-                displayClaims(null, {
-                    isValidSignature: false,
-                    errorMessage: `Verification Error: ${errorMessage}`
-                });
-                console.error("JWT Validation Error:", error);
             }
         }
 
@@ -297,6 +263,7 @@
                     <span class="security-status">${validation.isValidSignature ? 'VALID SIGNATURE' : 'INVALID SIGNATURE'}</span>
                     ${validation.isExpired ? '<span class="security-status expired">(EXPIRED)</span>' : ''}
                 </h3>
+                <div class="issuer-url">Issuing Authority: <a href="${claims.iss}" target="_blank">${claims.iss}</a></div>
                 <p class="description">Signature verification ${validation.isValidSignature ? 'succeeded' : 'failed'}${validation.isExpired ? ' but token has expired' : ''}.</p>
             `;
             outputDiv.appendChild(validityBanner);
@@ -314,7 +281,7 @@
                 "x-ms-azurevm-dbvalidated": { label:"DB Validation", description:"Indicates if the DB component has been validated." },
                 "x-ms-azurevm-dbxvalidated": { label:"DBX Validation", description:"Indicates if the DBX component has been validated." },
                 "x-ms-azurevm-debuggersdisabled": { label:"Debuggers Status", description:"Indicates if debuggers are disabled." },
-                "x-ms-azurevm-default-securebootkeysvalidated": { label:"Default Secure Boot Keys", description:"Indicates if default secure boot keys have been validated." },
+                "x-ms-azurevm-default-securebootkeysvalidated": { label:"Secure Boot Keys Validated", description:"Indicates if secure boot keys have been validated." },
                 "x-ms-azurevm-elam-enabled": { label:"ELAM Protection", description:"Indicates if ELAM (Early Launch Anti-Malware) is enabled." },
                 "x-ms-azurevm-flightsigning-enabled": { label:"Flight Signing", description:"Indicates if flight signing is enabled." },
                 "x-ms-azurevm-hvci-policy": { label:"HVCI Policy", description:"Hypervisor Code Integrity (HVCI) policy value." },
@@ -526,8 +493,6 @@
                         }
                         else if (['exp', 'iat', 'nbf'].includes(key)) {
                             group.innerHTML = `<div><strong>${label}:</strong> ${formatTimestamp(value, key)}</div>`;
-                        } else if (key === 'secureboot') {
-                            group.innerHTML = `<div><strong>${label}:</strong> ${createSecurityBadge(value).outerHTML}</div>`;
                         } else if (typeof value === 'object') {
                             group.innerHTML = `<div><strong>${label}:</strong></div>`;
                             if(sectionName === 'isolationTee') {
@@ -615,6 +580,40 @@
                     }
                 }
             });
+        }
+
+        async function validateJWT() {
+            try {
+                const header = decodeJwtHeader(jwtToken);
+                if (!header.jku || !header.kid) throw new Error("Missing jku or kid in token header");
+
+                if (header.alg !== 'RS256') {
+                    throw new Error(`Unsupported algorithm: ${header.alg}`);
+                }
+
+                const key = await fetchPublicKey(header.jku, header.kid);
+                const { payload, protectedHeader } = await jwtVerify(jwtToken, key, {
+                    algorithms: ['RS256']
+                });
+                
+                const now = Math.floor(Date.now() / 1000);
+                const isExpired = payload.exp < now;
+                displayClaims(payload, {
+                    isValidSignature: true,
+                    isExpired: isExpired
+                });
+                
+            } catch (error) {
+                const errorMessage = error.code === 'ERR_JWS_VERIFICATION_FAILED' 
+                    ? "Signature verification failed" 
+                    : error.message;
+                
+                displayClaims(null, {
+                    isValidSignature: false,
+                    errorMessage: `Verification Error: ${errorMessage}`
+                });
+                console.error("JWT Validation Error:", error);
+            }
         }
 
         window.onload = validateJWT;
@@ -865,11 +864,68 @@
         .timestamp {
             margin: 5px 0;
         }
+
+        .issuer-url {
+            margin: 10px 0;
+            font-size: 0.9em;
+            color: #2c3e50;
+        }
+
+        .issuer-url a {
+            color: #3498db;
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        .issuer-url a:hover {
+            text-decoration: underline;
+        }
+
+        .test-description {
+            background: #e8f4f8;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .test-description p {
+            margin: 10px 0;
+            color: #2c3e50;
+        }
+        
+        .test-description ul, .test-description ol {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+        
+        .test-description li {
+            margin: 5px 0;
+        }
+        
+        .test-description a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        .test-description a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Azure VM Attestation Report</h1>
+        <h1>Attestation Report</h1>
+        <div class="claim-section">
+            <p>
+                This page demonstrates client-side verification of an 
+                <a href="https://learn.microsoft.com/en-us/azure/attestation/overview">Azure Attestation</a> token
+                for a server running the <a href="https://github.com/comrade-coop/aapp-toolkit">aApp Toolkit</a>.
+                The token validates that the server is running in a Confidential VM and proves that the HTTPS certificate
+                for this domain was generated securely inside the Trusted Execution Environment (TEE). The page verifies
+                the JWT signature and displays the attestation claims in a human-readable format.
+            </p>
+        </div>
         <div id="output"></div>
     </div>
 </body>
