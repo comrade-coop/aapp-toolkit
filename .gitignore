@@ -1,4 +1,14 @@
 .aider*
 .env
-attestation/target
-Cargo.lock
+
+# Cmake Files
+**/cmake-build-debug
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/install_manifest.txt
+**/CMakeFiles/
+**/CTestTestfile.cmake
+**/Makefile
+**/*.cbp
+**/CMakeScripts
+**/compile_commands.json

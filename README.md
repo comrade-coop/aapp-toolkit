@@ -120,7 +120,9 @@ The **aApp Toolkit** follows the sidecar design pattern. Services are delivered 
   Multiple aApp instances form a network, actively monitoring application state and reporting to service discovery components.
 
 ## 🏗️ Acknowledgements
-We would like to express our gratitude to the [Constellation project](https://github.com/edgelesssys/constellation) for providing the build infrastructure used to create container-enabled confidential images and for their robust aTLS library, which powers the secure bootstrapping logic of the toolkit. Their contributions have been invaluable in advancing the development of secure and efficient TEE-based applications.
+We would like to express our gratitude to the [Constellation project](https://github.com/edgelesssys/constellation) for providing the build infrastructure used to create container-enabled confidential images and for their robust aTLS library, which powers the secure bootstrapping logic of the toolkit. Their contributions have been invaluable in advancing the development of secure and efficient TEE-based applications.  
+
+We also extend our thanks to Microsoft for providing [Azure Attestation Services](https://azure.microsoft.com/en-us/products/azure-attestation) and [open-source libraries](https://github.com/Azure/confidential-computing-cvm-guest-attestation) that streamline Remote Attestation. Their support has been instrumental in enabling secure and efficient attestation workflows, further strengthening the foundation of confidential computing applications.
 
 ## 🤝 Contributing
 
