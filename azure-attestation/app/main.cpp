@@ -58,7 +58,7 @@ static int getopt(int argc, char* const argv[], const char* optstring)
 #endif //!PLATFORM_UNIX
 
 void usage(char* programName) {
-    printf("Usage: %s -a <attestation-endpoint> -n <nonce> -o <%s|%s>\n", programName, OUTPUT_TYPE_BOOL, OUTPUT_TYPE_JWT);
+    printf("Usage: %s -a <attestation-endpoint> -n <nonce> -c <csr> -m <manifest> -o <%s|%s>\n", programName, OUTPUT_TYPE_BOOL, OUTPUT_TYPE_JWT);
 }
 
 int main(int argc, char* argv[]) {
@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
     std::string output_type;
 
     int opt;
-    while ((opt = getopt(argc, argv, ":a:n:o:")) != -1) {
+    while ((opt = getopt(argc, argv, ":a:n:c:m:o:")) != -1) {
         switch (opt) {
         case 'a':
             attestation_url.assign(optarg);
