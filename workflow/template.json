@@ -25,6 +25,20 @@
       "metadata": {
         "description": "The name of the existing SSH public key resource (of type Microsoft.Compute/sshPublicKeys) stored in the same resource group."
       }
+    },
+    "customData": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Cloud-init file content for the VM (for example, a cloud-init configuration file)."
+      }
+    },
+    "userData": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "YAML file content for the VM userData."
+      }
     }
   },
   "variables": {
@@ -73,11 +87,9 @@
     "hibernationEnabled": false,
     "adminUsername": "azureuser",
     "enablePeriodicAssessment": "ImageDefault",
-    "customData": "",
     "securityType": "ConfidentialVM",
     "secureBoot": true,
-    "vTPM": true,
-    "userData": ""
+    "vTPM": true
   },
   "resources": [
     {
@@ -197,9 +209,9 @@
               ]
             }
           },
-          "customData": "[variables('customData')]"
+          "customData": "[parameters('customData')]"
         },
-        "userData": "[variables('userData')]"
+        "userData": "[parameters('userData')]"
       }
     }
   ],
