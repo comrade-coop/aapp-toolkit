@@ -30,7 +30,7 @@
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Cloud-init file content for the VM (for example, a cloud-init configuration file)."
+        "description": "Cloud-init file content for the VM (for example, a cloud-init configuration file). This value will be base64 encoded by the template."
       }
     },
     "userData": {
@@ -209,7 +209,7 @@
               ]
             }
           },
-          "customData": "[parameters('customData')]"
+          "customData": "[base64(parameters('customData'))]"
         },
         "userData": "[base64(parameters('userData'))]"
       }
