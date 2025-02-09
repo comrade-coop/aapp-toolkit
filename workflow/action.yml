@@ -14,6 +14,9 @@ inputs:
   subscription_id:
     description: 'Azure Subscription ID'
     required: true
+  tenant_id:
+    description: 'Azure Tenant ID'
+    required: true
   resource_group:
     description: 'Azure Resource Group Name'
     required: true
@@ -34,6 +37,6 @@ runs:
     - shell: bash
       run: |
         output_file="${RUNNER_TEMP}/vm_output.json"
-        ${{ github.action_path }}/entrypoint.sh "${{ inputs.client_id }}" "${{ inputs.client_secret }}" "${{ inputs.subscription_id }}" "${{ inputs.resource_group }}" "${{ inputs.vm_name }}" "${{ inputs.aapp_manifest }}" > "${output_file}"
+        ${{ github.action_path }}/entrypoint.sh "${{ inputs.client_id }}" "${{ inputs.client_secret }}" "${{ inputs.subscription_id }}" "${{ inputs.tenant_id }}" "${{ inputs.resource_group }}" "${{ inputs.vm_name }}" "${{ inputs.aapp_manifest }}" > "${output_file}"
         echo "vm_id=$(jq -r .vm_id ${output_file})" >> $GITHUB_OUTPUT
         echo "vm_ip=$(jq -r .vm_ip ${output_file})" >> $GITHUB_OUTPUT

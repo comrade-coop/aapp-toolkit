@@ -7,12 +7,13 @@ set -e
 CLIENT_ID="$1"
 CLIENT_SECRET="$2"
 SUBSCRIPTION_ID="$3"
-RESOURCE_GROUP="$4"
-VM_NAME="$5"
-AAPP_MANIFEST="$6"
+TENANT_ID="$4"
+RESOURCE_GROUP="$5"
+VM_NAME="$6"
+AAPP_MANIFEST="$7"
 
 # Validate input parameters
-if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$SUBSCRIPTION_ID" ] || [ -z "$RESOURCE_GROUP" ] || [ -z "$VM_NAME" ] || [ -z "$AAPP_MANIFEST" ]; then
+if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$SUBSCRIPTION_ID" ] || [ -z "$TENANT_ID" ] || [ -z "$RESOURCE_GROUP" ] || [ -z "$VM_NAME" ] || [ -z "$AAPP_MANIFEST" ]; then
     echo "Error: All parameters must be provided"
     exit 1
 fi
@@ -26,7 +27,7 @@ echo "Logging in to Azure..."
 az login --service-principal \
     --username "$CLIENT_ID" \
     --password "$CLIENT_SECRET" \
-    --tenant "$SUBSCRIPTION_ID"
+    --tenant "$TENANT_ID"
 
 # Set subscription
 echo "Setting subscription..."
