@@ -1,6 +1,6 @@
-# Azure VM Creation GitHub Action
+# Azure CVM GitHub Action
 
-This action provides a reusable workflow component that creates an Azure VM in a specified resource group.
+This action provides a reusable workflow component that creates an Azure CVM in a specified resource group using aApp Toolkit.
 
 ## Prerequisites
 
@@ -10,14 +10,17 @@ This action provides a reusable workflow component that creates an Azure VM in a
 
 ## Inputs
 
-| Input | Description | Required |
-|-------|-------------|----------|
-| client_id | Azure App Registration Client ID | Yes |
-| client_secret | Azure App Registration Client Secret | Yes |
-| subscription_id | Azure Subscription ID | Yes |
-| resource_group | Azure Resource Group Name | Yes |
-| vm_name | Name for the new VM | Yes |
-| aapp_manifest | Path to YAML file containing VM initialization data | Yes |
+| Input             | Description                                               | Required | 
+|-------------------|-----------------------------------------------------------|----------|
+| client_id         | Azure App Registration Client ID                          | Yes      |
+| client_secret     | Azure App Registration Client Secret                       | Yes      |
+| subscription_id   | Azure Subscription ID                                      | Yes      |
+| tenant_id         | Azure Tenant ID                                           | Yes      |
+| resource_group    | Azure Resource Group Name                                  | Yes      |
+| vm_name           | Name for the new VM                                        | Yes      |
+| vm_network_id     | Azure VM Network ID                                        | Yes      |
+| vm_dev_key        | Azure VM Development Key                                   | Yes      |
+| aapp_manifest     | Path to YAML file containing VM initialization data       | Yes      |
 
 ## Usage
 
@@ -28,20 +31,12 @@ steps:
       client_id: ${{ secrets.AZURE_CLIENT_ID }}
       client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
       subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      tenant_id: ${{ secrets.AZURE_TENANT_ID }}
       resource_group: 'my-resource-group'
       vm_name: 'my-vm-name'
+      vm_network_id: ${{ secrets.AZURE_VM_NETWORK_ID }}
+      vm_dev_key: ${{ secrets.AZURE_VM_DEV_KEY }}
       aapp_manifest: './aapp_manifest.yml'
-```
-
-## Example Manifest YAML
-```yaml
-#cloud-config
-packages:
-  - docker.io
-  - docker-compose
-runcmd:
-  - systemctl start docker
-  - systemctl enable docker
 ```
 
 ## Example Workflow
@@ -59,8 +54,12 @@ jobs:
           client_id: ${{ secrets.AZURE_CLIENT_ID }}
           client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
           subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          tenant_id: ${{ secrets.AZURE_TENANT_ID }}
           resource_group: 'development-rg'
           vm_name: 'test-vm-001'
+          vm_network_id: ${{ secrets.AZURE_VM_NETWORK_ID }}
+          vm_dev_key: ${{ secrets.AZURE_VM_DEV_KEY }}
+          aapp_manifest: './aapp_manifest.yml'
 ```
 
 ## Versioning

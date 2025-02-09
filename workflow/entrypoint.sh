@@ -10,44 +10,49 @@ SUBSCRIPTION_ID="$3"
 TENANT_ID="$4"
 RESOURCE_GROUP="$5"
 VM_NAME="$6"
-AAPP_MANIFEST="$7"
+VM_NETWORK_ID="$7"
+VM_DEV_KEY="$8"
+AAPP_MANIFEST="$9"
+CLOUD_INIT="$10"
 
 # Validate input parameters
-if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$SUBSCRIPTION_ID" ] || [ -z "$TENANT_ID" ] || [ -z "$RESOURCE_GROUP" ] || [ -z "$VM_NAME" ] || [ -z "$AAPP_MANIFEST" ]; then
+if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$SUBSCRIPTION_ID" ] || [ -z "$TENANT_ID" ] || [ -z "$RESOURCE_GROUP" ] || [ -z "$VM_NAME" ] || [ -z "$VM_NETWORK_ID" ] || [ -z "$VM_DEV_KEY" ] || [ -z "$AAPP_MANIFEST" ] || [ -z "$CLOUD_INIT" ]; then
     echo "Error: All parameters must be provided"
     exit 1
 fi
 
-# Install Azure CLI
 echo "Installing Azure CLI..."
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
-# Login to Azure
 echo "Logging in to Azure..."
 az login --service-principal \
     --username "$CLIENT_ID" \
     --password "$CLIENT_SECRET" \
     --tenant "$TENANT_ID"
 
-# Set subscription
 echo "Setting subscription..."
 az account set --subscription "$SUBSCRIPTION_ID"
 
-# Validate manifest file exists
 if [ ! -f "$AAPP_MANIFEST" ]; then
     echo "Error: Manifest file not found at $AAPP_MANIFEST"
     exit 1
 fi
 
-# Create VM
+if [ ! -f "$CLOUD_INIT" ]; then
+    echo "Error: Cloud init file not found at $CLOUD_INIT"
+    exit 1
+fi
+
 echo "Creating VM: $VM_NAME with cloud-init and app manifest"
-az vm create \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$VM_NAME" \
-    --image Ubuntu2204 \
-    --admin-username azureuser \
-    --generate-ssh-keys \
-    --custom-data "@${GITHUB_ACTION_PATH}/../../image/cloud-init.yml" \
-    --user-data "$AAPP_MANIFEST"
+az deployment group create \
+    --resource-group $RESOURCE_GROUP \
+    --template-file template.json \
+    --parameters \
+                virtualMachineName="$VM_NAME" \
+                virtualNetworkId="$VM_NETWORK_ID" \
+                subnetName="default" \
+                sshKeyName="$VM_DEV_KEY" \
+                userData=@$AAPP_MANIFEST \
+                customData=@$CLOUD_INIT
 
 echo "VM creation completed successfully"

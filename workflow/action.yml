@@ -23,6 +23,12 @@ inputs:
   vm_name:
     description: 'Name for the new VM'
     required: true
+  vm_network_id:
+    description: 'Azure VM Network ID'
+    required: true
+  vm_dev_key:
+    description: 'Azure VM Development Key'
+    required: true
   aapp_manifest:
     description: 'Path to YAML file containing VM initialization data'
     required: true
@@ -37,6 +43,9 @@ runs:
     - shell: bash
       run: |
         output_file="${RUNNER_TEMP}/vm_output.json"
-        ${{ github.action_path }}/entrypoint.sh "${{ inputs.client_id }}" "${{ inputs.client_secret }}" "${{ inputs.subscription_id }}" "${{ inputs.tenant_id }}" "${{ inputs.resource_group }}" "${{ inputs.vm_name }}" "${{ inputs.aapp_manifest }}" > "${output_file}"
+        cloud_init_file="${{ github.action_path }}/../image/cloud-init.yml"
+        
+        ${{ github.action_path }}/entrypoint.sh "${{ inputs.client_id }}" "${{ inputs.client_secret }}" "${{ inputs.subscription_id }}" "${{ inputs.tenant_id }}" "${{ inputs.resource_group }}" "${{ inputs.vm_name }}" "${{ inputs.vm_network_id }}" "${{ inputs.vm_dev_key }}" "${{ inputs.aapp_manifest }}" "$cloud_init_file" > "${output_file}"
+        
         echo "vm_id=$(jq -r .vm_id ${output_file})" >> $GITHUB_OUTPUT
         echo "vm_ip=$(jq -r .vm_ip ${output_file})" >> $GITHUB_OUTPUT
