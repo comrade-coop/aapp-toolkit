@@ -1,0 +1,39 @@
+name: 'Azure VM Creation Action'
+description: 'Creates an Azure VM in a specified resource group'
+author: 'Comrade Cooperative'
+branding:
+  icon: 'cloud'
+  color: 'blue'
+inputs:
+  client_id:
+    description: 'Azure App Registration Client ID'
+    required: true
+  client_secret:
+    description: 'Azure App Registration Client Secret'
+    required: true
+  subscription_id:
+    description: 'Azure Subscription ID'
+    required: true
+  resource_group:
+    description: 'Azure Resource Group Name'
+    required: true
+  vm_name:
+    description: 'Name for the new VM'
+    required: true
+  aapp_manifest:
+    description: 'Path to YAML file containing VM initialization data'
+    required: true
+outputs:
+  vm_id:
+    description: 'The unique identifier of the created VM'
+  vm_ip:
+    description: 'The public IP address of the created VM'
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      run: |
+        output_file="${RUNNER_TEMP}/vm_output.json"
+        ${{ github.action_path }}/entrypoint.sh "${{ inputs.client_id }}" "${{ inputs.client_secret }}" "${{ inputs.subscription_id }}" "${{ inputs.resource_group }}" "${{ inputs.vm_name }}" "${{ inputs.aapp_manifest }}" > "${output_file}"
+        echo "vm_id=$(jq -r .vm_id ${output_file})" >> $GITHUB_OUTPUT
+        echo "vm_ip=$(jq -r .vm_ip ${output_file})" >> $GITHUB_OUTPUT

@@ -1,0 +1,24 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+# Remove openssh-server
+packages:
+  - git
+packages_remove:
+  - openssh-server
+
+# Write our startup script
+write_files:
+  - path: /root/startup.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      cd /root
+      git clone https://github.com/comrade-coop/aapp-toolkit.git
+      cd aapp-toolkit
+      bash bootstrap/init.sh
+
+# Run startup script
+runcmd:
+  - /root/startup.sh
