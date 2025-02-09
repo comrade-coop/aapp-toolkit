@@ -6,8 +6,8 @@ USER_DATA_BASE64=$(curl -H Metadata:true --noproxy "*" "http://169.254.169.254/m
 # Step 2: Decode the YAML file
 USER_DATA_YAML=$(echo "$USER_DATA_BASE64" | base64 --decode)
 
-# Step 3: Extract the value of spec.dns.root using yq (install it if necessary)
-DNS_ROOT=$(echo "$USER_DATA_YAML" | yq eval '.spec.dns.root' -)
+# Step 3: Extract the value of spec.ingress.hostname using yq (install it if necessary)
+DNS_ROOT=$(echo "$USER_DATA_YAML" | yq eval '.spec.ingress.hostname' -)
 
 # Step 4: Create CSR for the extracted domain
 OPENSSL_CONF="openssl.cnf"
