@@ -11,7 +11,7 @@
     "virtualNetworkId": {
       "type": "string",
       "metadata": {
-        "description": "The resource ID of the existing virtual network (e.g., /subscriptions/<subId>/resourceGroups/<rgName>/providers/Microsoft.Network/virtualNetworks/<vnetName>)."
+        "description": "The resource ID of the existing virtual network (for example: /subscriptions/<subId>/resourceGroups/<rgName>/providers/Microsoft.Network/virtualNetworks/<vnetName>)."
       }
     },
     "subnetName": {
@@ -37,7 +37,7 @@
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "YAML file content for the VM userData."
+        "description": "YAML file content for the VM userData. This value will be base64 encoded by the template."
       }
     }
   },
@@ -211,7 +211,7 @@
           },
           "customData": "[parameters('customData')]"
         },
-        "userData": "[parameters('userData')]"
+        "userData": "[base64(parameters('userData'))]"
       }
     }
   ],
