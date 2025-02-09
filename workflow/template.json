@@ -20,10 +20,10 @@
         "description": "The name of the subnet in the virtual network to which the NIC will be attached."
       }
     },
-    "adminPublicKey": {
+    "sshKeyName": {
       "type": "string",
       "metadata": {
-        "description": "The SSH public key to enable SSH authentication on the VM."
+        "description": "The name of the existing SSH public key resource (of type Microsoft.Compute/sshPublicKeys) stored in the same resource group."
       }
     }
   },
@@ -192,7 +192,7 @@
               "publicKeys": [
                 {
                   "path": "[concat('/home/', variables('adminUsername'), '/.ssh/authorized_keys')]",
-                  "keyData": "[parameters('adminPublicKey')]"
+                  "keyData": "[reference(resourceId(resourceGroup().name, 'Microsoft.Compute/sshPublicKeys', parameters('sshKeyName')), '2020-12-01').publicKey]"
                 }
               ]
             }
