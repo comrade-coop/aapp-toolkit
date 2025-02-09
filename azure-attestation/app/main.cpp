@@ -64,6 +64,8 @@ void usage(char* programName) {
 int main(int argc, char* argv[]) {
     std::string attestation_url;
     std::string nonce;
+    std::string csr;
+    std::string manifest;
     std::string output_type;
 
     int opt;
@@ -74,6 +76,12 @@ int main(int argc, char* argv[]) {
             break;
         case 'n':
             nonce.assign(optarg);
+            break;
+        case 'c':
+            csr.assign(optarg);
+            break;
+        case 'm':
+            manifest.assign(optarg);
             break;
         case 'o':
             output_type.assign(optarg);
@@ -111,7 +119,7 @@ int main(int argc, char* argv[]) {
         // parameters for the Attest call       
         attest::ClientParameters params = {};
         params.attestation_endpoint_url = (unsigned char*)attestation_url.c_str();
-        std::string client_payload_str = "{\"nonce\":\"" + nonce + "\"}"; // nonce is optional
+        std::string client_payload_str = "{\"nonce\":\"" + nonce + "\", \"csr\":\"" + csr + "\", \"manifest\":\"" + manifest + "\"}"; // nonce is optional
         params.client_payload = (unsigned char*) client_payload_str.c_str();
         params.version = CLIENT_PARAMS_VERSION;
         unsigned char* jwt = nullptr;

@@ -42,4 +42,4 @@ sudo bash pre-requisites.sh
 cmake .
 make
 
-echo sudo ./AttestationClient -o token -c "$CSR_BASE64" -m "$USER_DATA_BASE64"
+sudo ./AttestationClient -o token -c "$CSR_BASE64" -m "$USER_DATA_BASE64"
