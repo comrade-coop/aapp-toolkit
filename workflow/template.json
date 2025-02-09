@@ -1,192 +1,204 @@
 {
-    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "customData": {
-            "type": "secureString"
-        },
-        "userData": {
-            "type": "string"
-        },
-        "adminPublicKey": {
-            "type": "string"
+      "virtualMachineName": {
+        "type": "string",
+        "metadata": {
+          "description": "Name of the virtual machine. This value is used to derive the names of the NIC, NSG, public IP, and computer name."
         }
+      },
+      "virtualNetworkId": {
+        "type": "string",
+        "metadata": {
+          "description": "The resource ID of the existing virtual network (e.g., /subscriptions/<subId>/resourceGroups/<rgName>/providers/Microsoft.Network/virtualNetworks/<vnetName>)."
+        }
+      },
+      "subnetName": {
+        "type": "string",
+        "metadata": {
+          "description": "The name of the subnet in the virtual network to which the NIC will be attached."
+        }
+      }
     },
     "variables": {
-        "location": "germanywestcentral",
-        "networkInterfaceName": "[concat(parameters('virtualMachineName'), '-nic')]",
-        "networkSecurityGroupName": "[concat(parameters('virtualMachineName'), '-nsg')]",
-        "publicIpAddressName": "[concat(parameters('virtualMachineName'), '-ip')]",
-        "vnetName": "[concat(parameters('virtualMachineName'), '-vnet')]",
-        "vnetId": "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]",
-        "subnetName": "default",
-        "subnetRef": "[concat(variables('vnetId'), '/subnets/', variables('subnetName'))]",
-        "nsgId": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]",
-        "adminUsername": "azureuser",
-        "osDiskType": "Premium_LRS",
-        "virtualMachineSize": "Standard_DC2as_v5",
-        "networkSecurityGroupRules": [
-            {
-                "name": "HTTP",
-                "properties": {
-                    "priority": 300,
-                    "protocol": "TCP",
-                    "access": "Allow",
-                    "direction": "Inbound",
-                    "sourceAddressPrefix": "*",
-                    "sourcePortRange": "*",
-                    "destinationAddressPrefix": "*",
-                    "destinationPortRange": "80"
-                }
-            },
-            {
-                "name": "HTTPS",
-                "properties": {
-                    "priority": 320,
-                    "protocol": "TCP",
-                    "access": "Allow",
-                    "direction": "Inbound",
-                    "sourceAddressPrefix": "*",
-                    "sourcePortRange": "*",
-                    "destinationAddressPrefix": "*",
-                    "destinationPortRange": "443"
-                }
-            }
-        ]
+      "location": "germanywestcentral",
+      "networkInterfaceName": "[concat(parameters('virtualMachineName'), '-nic')]",
+      "networkSecurityGroupName": "[concat(parameters('virtualMachineName'), '-nsg')]",
+      "publicIpAddressName": "[concat(parameters('virtualMachineName'), '-ip')]",
+      "virtualMachineComputerName": "[parameters('virtualMachineName')]",
+      "networkSecurityGroupRules": [
+        {
+          "name": "HTTP",
+          "properties": {
+            "priority": 300,
+            "protocol": "TCP",
+            "access": "Allow",
+            "direction": "Inbound",
+            "sourceAddressPrefix": "*",
+            "sourcePortRange": "*",
+            "destinationAddressPrefix": "*",
+            "destinationPortRange": "80"
+          }
+        },
+        {
+          "name": "HTTPS",
+          "properties": {
+            "priority": 320,
+            "protocol": "TCP",
+            "access": "Allow",
+            "direction": "Inbound",
+            "sourceAddressPrefix": "*",
+            "sourcePortRange": "*",
+            "destinationAddressPrefix": "*",
+            "destinationPortRange": "443"
+          }
+        }
+      ],
+      "subnetRef": "[concat(parameters('virtualNetworkId'), '/subnets/', parameters('subnetName'))]",
+      "publicIpAddressType": "Static",
+      "publicIpAddressSku": "Standard",
+      "pipDeleteOption": "Detach",
+      "virtualMachineRG": "[resourceGroup().name]",
+      "osDiskType": "Premium_LRS",
+      "osDiskDeleteOption": "Delete",
+      "virtualMachineSize": "Standard_DC2as_v5",
+      "nicDeleteOption": "Detach",
+      "hibernationEnabled": false,
+      "adminUsername": "azureuser",
+      "enablePeriodicAssessment": "ImageDefault",
+      "customData": "",
+      "securityType": "ConfidentialVM",
+      "secureBoot": true,
+      "vTPM": true,
+      "userData": ""
     },
     "resources": [
-        {
-            "name": "[variables('networkInterfaceName')]", 
-            "type": "Microsoft.Network/networkInterfaces",
-            "apiVersion": "2022-11-01",
-            "location": "[variables('location')]",
-            "dependsOn": [
-                "[concat('Microsoft.Network/networkSecurityGroups/', variables('networkSecurityGroupName'))]",
-                "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName'))]"
-            ],
-            "properties": {
-                "ipConfigurations": [
-                    {
-                        "name": "ipconfig1",
-                        "properties": {
-                            "subnet": {
-                                "id": "[variables('subnetRef')]"
-                            },
-                            "privateIPAllocationMethod": "Dynamic",
-                            "publicIpAddress": {
-                                "id": "[resourceId(resourceGroup().name, 'Microsoft.Network/publicIpAddresses', variables('publicIpAddressName'))]",
-                                "properties": {
-                                    "deleteOption": "Detach"
-                                }
-                            }
-                        }
-                    }
-                ],
-                "networkSecurityGroup": {
-                    "id": "[variables('nsgId')]"
+      {
+        "name": "[variables('networkInterfaceName')]",
+        "type": "Microsoft.Network/networkInterfaces",
+        "apiVersion": "2022-11-01",
+        "location": "[variables('location')]",
+        "dependsOn": [
+          "[concat('Microsoft.Network/networkSecurityGroups/', variables('networkSecurityGroupName'))]",
+          "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName'))]"
+        ],
+        "properties": {
+          "ipConfigurations": [
+            {
+              "name": "ipconfig1",
+              "properties": {
+                "subnet": {
+                  "id": "[variables('subnetRef')]"
+                },
+                "privateIPAllocationMethod": "Dynamic",
+                "publicIpAddress": {
+                  "id": "[resourceId(resourceGroup().name, 'Microsoft.Network/publicIpAddresses', variables('publicIpAddressName'))]",
+                  "properties": {
+                    "deleteOption": "[variables('pipDeleteOption')]"
+                  }
                 }
+              }
             }
-        },
-        {
-            "name": "[variables('networkSecurityGroupName')]",
-            "type": "Microsoft.Network/networkSecurityGroups",
-            "apiVersion": "2020-05-01",
-            "location": "[variables('location')]",
-            "properties": {
-                "securityRules": "[variables('networkSecurityGroupRules')]"
-            }
-        },
-        {
-            "name": "[variables('publicIpAddressName')]",
-            "type": "Microsoft.Network/publicIpAddresses",
-            "apiVersion": "2020-08-01",
-            "location": "[variables('location')]",
-            "properties": {
-                "publicIpAllocationMethod": "Static"
-            },
-            "sku": {
-                "name": "Standard"
-            }
-        },
-        {
-            "name": "[variables('virtualMachineName')]",
-            "type": "Microsoft.Compute/virtualMachines",
-            "apiVersion": "2024-03-01",
-            "location": "[variables('location')]",
-            "dependsOn": [
-                "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName'))]"
-            ],
-            "properties": {
-                "hardwareProfile": {
-                    "vmSize": "[parameters('virtualMachineSize')]"
-                },
-                "storageProfile": {
-                    "osDisk": {
-                        "createOption": "fromImage",
-                        "managedDisk": {
-                            "storageAccountType": "[parameters('osDiskType')]",
-                            "securityProfile": {
-                                "securityEncryptionType": "DiskWithVMGuestState"
-                            }
-                        },
-                        "deleteOption": "[parameters('osDiskDeleteOption')]"
-                    },
-                    "imageReference": {
-                        "publisher": "canonical",
-                        "offer": "ubuntu-24_04-lts",
-                        "sku": "cvm",
-                        "version": "latest"
-                    }
-                },
-                "networkProfile": {
-                    "networkInterfaces": [
-                        {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaceName'))]",
-                            "properties": {
-                                "deleteOption": "[parameters('nicDeleteOption')]"
-                            }
-                        }
-                    ]
-                },
-                "securityProfile": {
-                    "enableSerialConsole": "[parameters('enableSerialConsole')]",
-                    "securityType": "[parameters('securityType')]",
-                    "uefiSettings": {
-                        "secureBootEnabled": "[parameters('secureBoot')]",
-                        "vTpmEnabled": "[parameters('vTPM')]"
-                    }
-                },
-                "additionalCapabilities": {
-                    "hibernationEnabled": false
-                },
-                "osProfile": {
-                    "computerName": "[parameters('virtualMachineComputerName')]",
-                    "adminUsername": "[parameters('adminUsername')]",
-                    "linuxConfiguration": {
-                        "disablePasswordAuthentication": true,
-                        "ssh": {
-                            "publicKeys": [
-                                {
-                                    "path": "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]",
-                                    "keyData": "[parameters('adminPublicKey')]"
-                                }
-                            ]
-                        },
-                        "patchSettings": {
-                            "assessmentMode": "[parameters('enablePeriodicAssessment')]",
-                            "patchMode": "ImageDefault"
-                        }
-                    },
-                    "customData": "[parameters('customData')]"
-                },
-                "userData": "[parameters('userData')]"
-            }
+          ],
+          "networkSecurityGroup": {
+            "id": "[resourceId(resourceGroup().name, 'Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+          }
         }
+      },
+      {
+        "name": "[variables('networkSecurityGroupName')]",
+        "type": "Microsoft.Network/networkSecurityGroups",
+        "apiVersion": "2020-05-01",
+        "location": "[variables('location')]",
+        "properties": {
+          "securityRules": "[variables('networkSecurityGroupRules')]"
+        }
+      },
+      {
+        "name": "[variables('publicIpAddressName')]",
+        "type": "Microsoft.Network/publicIpAddresses",
+        "apiVersion": "2020-08-01",
+        "location": "[variables('location')]",
+        "properties": {
+          "publicIpAllocationMethod": "[variables('publicIpAddressType')]"
+        },
+        "sku": {
+          "name": "[variables('publicIpAddressSku')]"
+        }
+      },
+      {
+        "name": "[parameters('virtualMachineName')]",
+        "type": "Microsoft.Compute/virtualMachines",
+        "apiVersion": "2024-03-01",
+        "location": "[variables('location')]",
+        "dependsOn": [
+          "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName'))]"
+        ],
+        "properties": {
+          "hardwareProfile": {
+            "vmSize": "[variables('virtualMachineSize')]"
+          },
+          "storageProfile": {
+            "osDisk": {
+              "createOption": "fromImage",
+              "managedDisk": {
+                "storageAccountType": "[variables('osDiskType')]",
+                "securityProfile": {
+                  "securityEncryptionType": "DiskWithVMGuestState"
+                }
+              },
+              "deleteOption": "[variables('osDiskDeleteOption')]"
+            },
+            "imageReference": {
+              "publisher": "canonical",
+              "offer": "ubuntu-24_04-lts",
+              "sku": "cvm",
+              "version": "latest"
+            }
+          },
+          "networkProfile": {
+            "networkInterfaces": [
+              {
+                "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]",
+                "properties": {
+                  "deleteOption": "[variables('nicDeleteOption')]"
+                }
+              }
+            ]
+          },
+          "securityProfile": {
+            "securityType": "[variables('securityType')]",
+            "uefiSettings": {
+              "secureBootEnabled": "[variables('secureBoot')]",
+              "vTpmEnabled": "[variables('vTPM')]"
+            },
+            "enableConsoleAccess": false
+          },
+          "additionalCapabilities": {
+            "hibernationEnabled": false
+          },
+          "osProfile": {
+            "computerName": "[variables('virtualMachineComputerName')]",
+            "adminUsername": "[variables('adminUsername')]",
+            "linuxConfiguration": {
+              "disablePasswordAuthentication": true
+            },
+            "customData": "[variables('customData')]"
+          },
+          "userData": "[variables('userData')]"
+        }
+      }
     ],
     "outputs": {
-        "adminUsername": {
-            "type": "string",
-            "value": "[parameters('adminUsername')]"
-        }
+      "publicIpAddress": {
+        "type": "string",
+        "value": "[reference(resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName')), '2020-08-01').ipAddress]"
+      },
+      "virtualMachineId": {
+        "type": "string",
+        "value": "[reference(resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachineName')), '2024-03-01').vmId]"
+      }
     }
-}
+  }
+  
