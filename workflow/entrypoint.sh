@@ -13,7 +13,7 @@ VM_NAME="$6"
 VM_NETWORK_ID="$7"
 VM_DEV_KEY="$8"
 AAPP_MANIFEST="$9"
-CLOUD_INIT="${10}"
+WORKFLOW_PATH="${10}"
 
 # Validate input parameters
 if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$SUBSCRIPTION_ID" ] || [ -z "$TENANT_ID" ] || [ -z "$RESOURCE_GROUP" ] || [ -z "$VM_NAME" ] || [ -z "$VM_NETWORK_ID" ] || [ -z "$VM_DEV_KEY" ] || [ -z "$AAPP_MANIFEST" ] || [ -z "$CLOUD_INIT" ]; then
@@ -38,15 +38,13 @@ if [ ! -f "$AAPP_MANIFEST" ]; then
     exit 1
 fi
 
-if [ ! -f "$CLOUD_INIT" ]; then
-    echo "Error: Cloud init file not found at $CLOUD_INIT"
-    exit 1
-fi
+CLOUD_INIT="$WORKFLOW_PATH/../image/cloud-init.yml"
+ARM_TEMPLATE="$WORKFLOW_PATH/template.json"
 
 echo "Creating VM: $VM_NAME with cloud-init and app manifest"
 az deployment group create \
     --resource-group $RESOURCE_GROUP \
-    --template-file template.json \
+    --template-file $ARM_TEMPLATE \
     --parameters \
                 virtualMachineName="$VM_NAME" \
                 virtualNetworkId="$VM_NETWORK_ID" \
