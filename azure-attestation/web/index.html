@@ -22,10 +22,7 @@
 
         async function fetchReferenceState() {
             try {
-                const hash = window.location.hash.substring(1);
-                const params = new URLSearchParams(hash);
-                const referenceStateUrl = params.get('reference_state_url');
-                const response = await fetch(referenceStateUrl);
+                const response = await fetch("/.well-known/attest/reference");
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -612,7 +609,7 @@
         async function validateJWT() {
             try {
                 const referenceState = await fetchReferenceState();
-                
+
                 const nonce = generateNonce();
                 const jwtToken = await fetchToken(nonce);
                 const header = decodeJwtHeader(jwtToken);
