@@ -7,7 +7,34 @@
     <script type="module">
         import { jwtVerify } from 'https://cdn.skypack.dev/jose';
 
-        const jwtToken = "MAS_JWT_TOKEN"; // Replace with an actual JWT token
+        async function fetchToken(nonce) {
+            try {
+                const response = await fetch(`/.well-known/attest/token?nonce=${nonce}`);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const data = await response.json();
+                return data.token;
+            } catch (error) {
+                console.error("Error fetching token:", error);
+            }
+        }
+
+        async function fetchReferenceState() {
+            try {
+                const hash = window.location.hash.substring(1);
+                const params = new URLSearchParams(hash);
+                const referenceStateUrl = params.get('reference_state_url');
+                const response = await fetch(referenceStateUrl);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error("Error fetching reference state:", error);
+            }
+        }
 
         function decodeJwtHeader(token) {
             try {
@@ -40,21 +67,6 @@
                 console.error("Error fetching public key:", error);
                 throw new Error("Failed to import public key");
             }
-        }
-
-        function decodeXMsRuntime(encodedData, outputElement) {
-            const hexString = atob(encodedData);
-            const bytes = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-
-            const ipv4 = `${bytes[12]}.${bytes[13]}.${bytes[14]}.${bytes[15]}`;
-            const randomToken = [...bytes.slice(16, 32)].map(b => b.toString(16).padStart(2, '0')).join('');
-            const certFingerprint = [...bytes.slice(32, 64)].map(b => b.toString(16).padStart(2, '0')).join('');
-
-            outputElement.innerHTML = `
-                <div><strong>IPv4 Address:</strong> ${ipv4}</div>
-                <div><strong>Random Token:</strong> ${randomToken}</div>
-                <div><strong>Certificate Fingerprint:</strong> ${certFingerprint}</div>
-            `;
         }
 
         function formatTimestamp(unixTimestamp, claimKey) {
@@ -521,78 +533,88 @@
                     outputDiv.appendChild(section);
 
                     // Add TLS Certificate immediately after timestamps section
-                    if (sectionName === 'timestamps' && claims['x-ms-runtime']?.['client-payload']?.nonce) {
-                        const tlsSection = document.createElement('div');
-                        tlsSection.className = 'claim-section';
-                        const browser = detectBrowser();
+                    // if (sectionName === 'timestamps' && claims['x-ms-runtime']?.['client-payload']?.nonce) {
+                    //     const tlsSection = document.createElement('div');
+                    //     tlsSection.className = 'claim-section';
+                    //     const browser = detectBrowser();
                         
-                        const browserInstructions = {
-                            Chrome: `
-                                <div class="browser-specific">
-                                    <h5>Chrome/Edge Instructions:</h5>
-                                    <ol>
-                                        <li>Click the padlock icon in the address bar</li>
-                                        <li>Click "Connection is secure"</li>
-                                        <li>Click "Certificate is valid"</li>
-                                        <li>Go to "Details" tab</li>
-                                        <li>Find "Thumbprint" or "SHA-1 Fingerprint" field</li>
-                                        <li>Compare it with the Certificate Fingerprint shown above</li>
-                                    </ol>
-                                </div>
-                            `,
-                            Firefox: `
-                                <div class="browser-specific">
-                                    <h5>Firefox Instructions:</h5>
-                                    <ol>
-                                        <li>Click the padlock icon in the address bar</li>
-                                        <li>Click the ">" arrow next to "Connection secure"</li>
-                                        <li>Click "More Information"</li>
-                                        <li>Click "View Certificate"</li>
-                                        <li>Find "Fingerprint (SHA-1)" field</li>
-                                        <li>Compare it with the Certificate Fingerprint shown above</li>
-                                    </ol>
-                                </div>
-                            `,
-                            Safari: `
-                                <div class="browser-specific">
-                                    <h5>Safari Instructions:</h5>
-                                    <ol>
-                                        <li>Click the padlock icon in the address bar</li>
-                                        <li>Click "Show Certificate"</li>
-                                        <li>Expand the certificate details</li>
-                                        <li>Find "SHA-1 Certificate Fingerprint"</li>
-                                        <li>Compare it with the Certificate Fingerprint shown above</li>
-                                    </ol>
-                                </div>
-                            `,
-                            Unknown: `
-                                <div class="browser-specific">
-                                    <h5>Browser Instructions:</h5>
-                                    <p>Please use Chrome, Firefox, or Safari to verify the certificate.</p>
-                                </div>
-                            `
-                        };
+                    //     const browserInstructions = {
+                    //         Chrome: `
+                    //             <div class="browser-specific">
+                    //                 <h5>Chrome/Edge Instructions:</h5>
+                    //                 <ol>
+                    //                     <li>Click the padlock icon in the address bar</li>
+                    //                     <li>Click "Connection is secure"</li>
+                    //                     <li>Click "Certificate is valid"</li>
+                    //                     <li>Go to "Details" tab</li>
+                    //                     <li>Find "Thumbprint" or "SHA-1 Fingerprint" field</li>
+                    //                     <li>Compare it with the Certificate Fingerprint shown above</li>
+                    //                 </ol>
+                    //             </div>
+                    //         `,
+                    //         Firefox: `
+                    //             <div class="browser-specific">
+                    //                 <h5>Firefox Instructions:</h5>
+                    //                 <ol>
+                    //                     <li>Click the padlock icon in the address bar</li>
+                    //                     <li>Click the ">" arrow next to "Connection secure"</li>
+                    //                     <li>Click "More Information"</li>
+                    //                     <li>Click "View Certificate"</li>
+                    //                     <li>Find "Fingerprint (SHA-1)" field</li>
+                    //                     <li>Compare it with the Certificate Fingerprint shown above</li>
+                    //                 </ol>
+                    //             </div>
+                    //         `,
+                    //         Safari: `
+                    //             <div class="browser-specific">
+                    //                 <h5>Safari Instructions:</h5>
+                    //                 <ol>
+                    //                     <li>Click the padlock icon in the address bar</li>
+                    //                     <li>Click "Show Certificate"</li>
+                    //                     <li>Expand the certificate details</li>
+                    //                     <li>Find "SHA-1 Certificate Fingerprint"</li>
+                    //                     <li>Compare it with the Certificate Fingerprint shown above</li>
+                    //                 </ol>
+                    //             </div>
+                    //         `,
+                    //         Unknown: `
+                    //             <div class="browser-specific">
+                    //                 <h5>Browser Instructions:</h5>
+                    //                 <p>Please use Chrome, Firefox, or Safari to verify the certificate.</p>
+                    //             </div>
+                    //         `
+                    //     };
 
-                        tlsSection.innerHTML = `
-                            <h3>TLS Certificate</h3>
-                            <div class="decoded-tls-output"></div>
-                            <div class="browser-instructions">
-                                <h4>How to Verify Certificate in Your Browser</h4>
-                                <p>To verify if this certificate matches your current HTTPS connection:</p>
-                                ${browserInstructions[browser]}
-                            </div>
-                        `;
+                    //     tlsSection.innerHTML = `
+                    //         <h3>TLS Certificate</h3>
+                    //         <div class="decoded-tls-output"></div>
+                    //         <div class="browser-instructions">
+                    //             <h4>How to Verify Certificate in Your Browser</h4>
+                    //             <p>To verify if this certificate matches your current HTTPS connection:</p>
+                    //             ${browserInstructions[browser]}
+                    //         </div>
+                    //     `;
                         
-                        const tlsOutput = tlsSection.querySelector('.decoded-tls-output');
-                        decodeXMsRuntime(claims['x-ms-runtime']['client-payload'].nonce, tlsOutput);
-                        outputDiv.appendChild(tlsSection);
-                    }
+                    //     const tlsOutput = tlsSection.querySelector('.decoded-tls-output');
+                    //     decodeXMsRuntime(claims['x-ms-runtime']['client-payload'].nonce, tlsOutput);
+                    //     outputDiv.appendChild(tlsSection);
+                    // }
                 }
             });
         }
 
+        function generateNonce(length = 32) {
+            const array = new Uint8Array(length);
+            window.crypto.getRandomValues(array);
+            return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+
         async function validateJWT() {
             try {
+                const referenceState = await fetchReferenceState();
+                
+                const nonce = generateNonce();
+                const jwtToken = await fetchToken(nonce);
                 const header = decodeJwtHeader(jwtToken);
                 if (!header.jku || !header.kid) throw new Error("Missing jku or kid in token header");
 
