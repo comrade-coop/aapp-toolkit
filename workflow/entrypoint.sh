@@ -16,7 +16,7 @@ AAPP_MANIFEST="$9"
 WORKFLOW_PATH="${10}"
 
 # Validate input parameters
-if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$SUBSCRIPTION_ID" ] || [ -z "$TENANT_ID" ] || [ -z "$RESOURCE_GROUP" ] || [ -z "$VM_NAME" ] || [ -z "$VM_NETWORK_ID" ] || [ -z "$VM_DEV_KEY" ] || [ -z "$AAPP_MANIFEST" ] || [ -z "$CLOUD_INIT" ]; then
+if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$SUBSCRIPTION_ID" ] || [ -z "$TENANT_ID" ] || [ -z "$RESOURCE_GROUP" ] || [ -z "$VM_NAME" ] || [ -z "$VM_NETWORK_ID" ] || [ -z "$VM_DEV_KEY" ] || [ -z "$AAPP_MANIFEST" ] || [ -z "$WORKFLOW_PATH" ]; then
     echo "Error: All parameters must be provided"
     exit 1
 fi
