@@ -98,27 +98,22 @@ runs:
     - shell: bash
       name: Run Certbot in manual mode with DNS challenge
       run: |
-        sudo certbot certonly \
-          --manual \
-          --preferred-challenges dns \
-          --non-interactive \
-          --agree-tos \
-          --email "${{ inputs.certbot_email }}" \
-          --manual-auth-hook "${{ github.action_path }}/dns-challenge-webhook.sh" \
-          --csr "${RUNNER_TEMP}/cert.csr"
+        LOG_FILE="${RUNNER_TEMP}/dns-hook.log"
+        touch "$LOG_FILE"
 
-    - shell: bash
-      name: Run Certbot in manual mode with DNS challenge
-      run: |
-        sudo certbot certonly \
-          --manual \
-          --preferred-challenges dns \
-          --non-interactive \
-          --agree-tos \
-          --email "${{ inputs.certbot_email }}" \
-          --manual-auth-hook "${{ github.action_path }}/dns-challenge-webhook.sh" \
-          --csr "${RUNNER_TEMP}/cert.csr"
-    
+        sudo -E HOOK_LOG="$LOG_FILE" certbot certonly \
+                  --manual \
+                  --preferred-challenges dns \
+                  --non-interactive \
+                  --agree-tos \
+                  --email "${{ inputs.certbot_email }}" \
+                  --manual-auth-hook "${{ github.action_path }}/dns-challenge-webhook.sh" \
+                  --csr "${RUNNER_TEMP}/cert.csr" &
+        CERTBOT_PID=$!
+
+        tail -f "$LOG_FILE" --pid="$CERTBOT_PID"
+        wait "$CERTBOT_PID"
+
     - shell: bash
       name: Send Base64 Encoded Cert via POST Request
       run: |
