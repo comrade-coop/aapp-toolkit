@@ -32,6 +32,9 @@ inputs:
   aapp_manifest:
     description: 'Path to YAML file containing VM initialization data'
     required: true
+  cerbot_email:
+    description: 'Email for certbot certificate issuing'
+    required: true
 outputs:
   vm_id:
     description: 'The unique identifier of the created VM'
@@ -41,6 +44,7 @@ runs:
   using: 'composite'
   steps:
     - shell: bash
+      id: create_vm
       run: |
         output_file="${RUNNER_TEMP}/vm_output.json"
         
@@ -53,4 +57,45 @@ runs:
                                                 "${{ inputs.vm_network_id }}" \
                                                 "${{ inputs.vm_dev_key }}" \
                                                 "${{ inputs.aapp_manifest }}" \
-                                                "${{ github.action_path }}"
+                                                "${{ github.action_path }}" \
+                                                $output_file
+        
+        public_ip=$(jq -r '.properties.outputs.publicIpAddress.value' $output_file)
+        vm_id=$(jq -r '.properties.outputs.virtualMachineId.value' $output_file)
+        
+        # Set the values as step outputs (using the recommended $GITHUB_OUTPUT method)
+        echo "publicIp=${public_ip}" >> $GITHUB_OUTPUT
+        echo "vmId=${vm_id}" >> $GITHUB_OUTPUT
+
+    - name: Fetch token and create cert.csr
+      run: |
+        # Perform GET request to the server
+        response=$(curl -s "http://${{ steps.create_vm.outputs.publicIp }}:12345")
+        echo "Server response: $response"
+
+        # Extract the 'token' value from the JSON response using jq
+        token=$(echo "$response" | jq -r '.token')
+        echo "Extracted token: $token"
+
+        # Base64 decode the token and save it as cert.csr
+        echo "$token" | base64 --decode > "${RUNNER_TEMP}/cert.csr"
+      shell: bash
+
+    - name: Install dependencies (Certbot and dig)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y certbot dnsutils
+
+    - name: Ensure hook script is executable
+      run: chmod +x ${{ github.action_path }}/dns-challenge-webhook.sh
+
+    - name: Run Certbot in manual mode with DNS challenge
+      run: |
+        sudo certbot certonly \
+          --manual \
+          --preferred-challenges dns \
+          --non-interactive \
+          --agree-tos \
+          --email "${{ inputs.certbot_email }}" \
+          --manual-auth-hook "${{ github.action_path }}/dns-challenge-webhook.sh" \
+          --csr "${RUNNER_TEMP}/cert.csr"

@@ -14,9 +14,10 @@ VM_NETWORK_ID="$7"
 VM_DEV_KEY="$8"
 AAPP_MANIFEST="$9"
 WORKFLOW_PATH="${10}"
+OUTPUT_PATH="${11}"
 
 # Validate input parameters
-if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$SUBSCRIPTION_ID" ] || [ -z "$TENANT_ID" ] || [ -z "$RESOURCE_GROUP" ] || [ -z "$VM_NAME" ] || [ -z "$VM_NETWORK_ID" ] || [ -z "$VM_DEV_KEY" ] || [ -z "$AAPP_MANIFEST" ] || [ -z "$WORKFLOW_PATH" ]; then
+if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$SUBSCRIPTION_ID" ] || [ -z "$TENANT_ID" ] || [ -z "$RESOURCE_GROUP" ] || [ -z "$VM_NAME" ] || [ -z "$VM_NETWORK_ID" ] || [ -z "$VM_DEV_KEY" ] || [ -z "$AAPP_MANIFEST" ] || [ -z "$WORKFLOW_PATH" ] || [ -z "$OUTPUT_PATH" ]; then
     echo "Error: All parameters must be provided"
     exit 1
 fi
@@ -51,6 +52,6 @@ az deployment group create \
                 subnetName="default" \
                 sshKeyName="$VM_DEV_KEY" \
                 userData=@$AAPP_MANIFEST \
-                customData=@$CLOUD_INIT
+                customData=@$CLOUD_INIT > $OUTPUT_PATH
 
-echo "VM creation completed successfully"
+echo "VM creation completed successfully: $OUTPUT_PATH"
