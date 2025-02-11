@@ -80,7 +80,6 @@ runs:
 
         # Base64 decode the token and save it as cert.csr
         echo "$token" | base64 --decode > "${RUNNER_TEMP}/cert.csr"
-      shell: bash
 
     - shell: bash
       name: Install dependencies (Certbot and dig)
