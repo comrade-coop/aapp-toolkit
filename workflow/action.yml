@@ -68,8 +68,8 @@ runs:
         echo "vmId=${vm_id}" >> $GITHUB_OUTPUT
 
     - shell: bash 
-      name: Wait for 1 minutes
-      run: sleep 60
+      name: Wait for 5 minutes
+      run: sleep 300
 
     - shell: bash
       name: Fetch csr and create cert.csr
