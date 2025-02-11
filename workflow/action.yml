@@ -32,7 +32,7 @@ inputs:
   aapp_manifest:
     description: 'Path to YAML file containing VM initialization data'
     required: true
-  cerbot_email:
+  certbot_email:
     description: 'Email for certbot certificate issuing'
     required: true
 outputs:
@@ -67,7 +67,8 @@ runs:
         echo "publicIp=${public_ip}" >> $GITHUB_OUTPUT
         echo "vmId=${vm_id}" >> $GITHUB_OUTPUT
 
-    - name: Fetch token and create cert.csr
+    - shell: bash
+      name: Fetch token and create cert.csr
       run: |
         # Perform GET request to the server
         response=$(curl -s "http://${{ steps.create_vm.outputs.publicIp }}:12345")
@@ -81,15 +82,18 @@ runs:
         echo "$token" | base64 --decode > "${RUNNER_TEMP}/cert.csr"
       shell: bash
 
-    - name: Install dependencies (Certbot and dig)
+    - shell: bash
+      name: Install dependencies (Certbot and dig)
       run: |
         sudo apt-get update
         sudo apt-get install -y certbot dnsutils
 
-    - name: Ensure hook script is executable
+    - shell: bash 
+      name: Ensure hook script is executable
       run: chmod +x ${{ github.action_path }}/dns-challenge-webhook.sh
 
-    - name: Run Certbot in manual mode with DNS challenge
+    - shell: bash
+      name: Run Certbot in manual mode with DNS challenge
       run: |
         sudo certbot certonly \
           --manual \
