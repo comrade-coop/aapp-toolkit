@@ -67,6 +67,10 @@ runs:
         echo "publicIp=${public_ip}" >> $GITHUB_OUTPUT
         echo "vmId=${vm_id}" >> $GITHUB_OUTPUT
 
+    - shell: bash 
+      name: Wait for 5 minutes
+      run: sleep 300
+
     - shell: bash
       name: Fetch token and create cert.csr
       run: |
