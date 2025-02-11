@@ -93,3 +93,44 @@ echo "www-data ALL=(ALL) NOPASSWD: ${COMMAND}" > "$SUDOERS_FILE"
 chmod 0440 "$SUDOERS_FILE"
 
 service nginx restart
+
+cd /root
+git clone $AAPPREPO aapp-code
+cd aapp-code
+git checkout $AAPPCOMMITSHA
+
+AAPPDOCKERFILE=$(jq -r '.spec.container.build.dockerfile' "$USER_DATA_JSON")
+ENCODED_BUILD_ARGS=$(jq -r '.spec.container.build.args' "$USER_DATA_JSON")
+if [[ -z "$ENCODED_BUILD_ARGS" || "$ENCODED_BUILD_ARGS" == "null" ]]; then
+    echo "Error: No valid base64 .env content found in JSON file!"
+    exit 1
+fi
+
+# Decode and store it into a aapp.args file
+echo "$ENCODED_BUILD_ARGS" | base64 --decode > aapp.args
+
+apt-get update -yq
+apt-get install -yq docker.io
+
+systemctl start docker
+systemctl enable docker
+
+# Read and process the aapp.args file
+BUILD_ARGS=""
+while IFS='=' read -r key value; do
+    # Ignore lines that are empty or start with a comment
+    if [[ -n "$key" && "$key" != "#"* ]]; then
+        # Remove any potential carriage returns or quotes
+        key=$(echo "$key" | tr -d '"')
+        value=$(echo "$value" | tr -d '"')
+        
+        # Append to build args
+        BUILD_ARGS+=" --build-arg $key=$value"
+    fi
+done < "aapp.args"
+
+# Run the docker build command with extracted arguments
+docker build $BUILD_ARGS -f $AAPPDOCKERFILE -t aapp-image .
+
+# Run the Docker container in the background
+docker run -d -p $AAPPPORT:$AAPPPORT  aapp-image
