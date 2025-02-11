@@ -72,18 +72,18 @@ runs:
       run: sleep 300
 
     - shell: bash
-      name: Fetch token and create cert.csr
+      name: Fetch csr and create cert.csr
       run: |
         # Perform GET request to the server
         response=$(curl -s "http://${{ steps.create_vm.outputs.publicIp }}:12345")
         echo "Server response: $response"
 
-        # Extract the 'token' value from the JSON response using jq
-        token=$(echo "$response" | jq -r '.token')
-        echo "Extracted token: $token"
+        # Extract the 'csr' value from the JSON response using jq
+        csr=$(echo "$response" | jq -r '.csr')
+        echo "Extracted csr: $csr"
 
-        # Base64 decode the token and save it as cert.csr
-        echo "$token" | base64 --decode > "${RUNNER_TEMP}/cert.csr"
+        # Base64 decode the csr and save it as cert.csr
+        echo "$csr" | base64 --decode > "${RUNNER_TEMP}/cert.csr"
 
     - shell: bash
       name: Install dependencies (Certbot and dig)
