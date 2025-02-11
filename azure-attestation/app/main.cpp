@@ -58,13 +58,13 @@ static int getopt(int argc, char* const argv[], const char* optstring)
 #endif //!PLATFORM_UNIX
 
 void usage(char* programName) {
-    printf("Usage: %s -a <attestation-endpoint> -n <nonce> -c <csr> -m <manifest> -o <%s|%s>\n", programName, OUTPUT_TYPE_BOOL, OUTPUT_TYPE_JWT);
+    printf("Usage: %s -a <attestation-endpoint> -n <nonce> -c <cert-sha1> -m <manifest-sha1> -o <%s|%s>\n", programName, OUTPUT_TYPE_BOOL, OUTPUT_TYPE_JWT);
 }
 
 int main(int argc, char* argv[]) {
     std::string attestation_url;
     std::string nonce;
-    std::string csr;
+    std::string cert;
     std::string manifest;
     std::string output_type;
 
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
             nonce.assign(optarg);
             break;
         case 'c':
-            csr.assign(optarg);
+            cert.assign(optarg);
             break;
         case 'm':
             manifest.assign(optarg);
@@ -116,24 +116,24 @@ int main(int argc, char* argv[]) {
             exit(1);
         }
 
-        // parameters for the Attest call       
+        // parameters for the Attest call
         attest::ClientParameters params = {};
         params.attestation_endpoint_url = (unsigned char*)attestation_url.c_str();
-        std::string client_payload_str = "{\"nonce\":\"" + nonce + "\", \"csr\":\"" + csr + "\", \"manifest\":\"" + manifest + "\"}"; // nonce is optional
+        std::string client_payload_str = "{\"nonce\":\"" + nonce + "\",\"cert\":\"" + cert + "\",\"manifest\":\"" + manifest + "\"}";
         params.client_payload = (unsigned char*) client_payload_str.c_str();
         params.version = CLIENT_PARAMS_VERSION;
         unsigned char* jwt = nullptr;
         attest::AttestationResult result;
-        
+
         bool is_cvm = false;
         bool attestation_success = true;
         std::string jwt_str;
         // call attest
-        if ((result = attestation_client->Attest(params, &jwt)).code_ 
+        if ((result = attestation_client->Attest(params, &jwt)).code_
                 != attest::AttestationResult::ErrorCode::SUCCESS) {
             attestation_success = false;
         }
-	
+
         if (attestation_success) {
             jwt_str = reinterpret_cast<char*>(jwt);
             attestation_client->Free(jwt);
@@ -147,9 +147,9 @@ int main(int argc, char* argv[]) {
 
             json attestation_claims = json::parse(base64_decode(tokens[1]));
             try {
-                std::string attestation_type 
+                std::string attestation_type
                     = attestation_claims["x-ms-isolation-tee"]["x-ms-attestation-type"].get<std::string>();
-                std::string compliance_status 
+                std::string compliance_status
                     = attestation_claims["x-ms-isolation-tee"]["x-ms-compliance-status"].get<std::string>();
                 if (boost::iequals(attestation_type, "sevsnpvm") &&
                     boost::iequals(compliance_status, "azure-compliant-cvm")){
@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (boost::iequals(output_type, OUTPUT_TYPE_JWT)) {
-            printf("%s", attestation_success ? jwt_str.c_str() : result.description_.c_str());   
+            printf("%s", attestation_success ? jwt_str.c_str() : result.description_.c_str());
         }
         else {
             printf("%s", is_cvm ? "true" : "false");

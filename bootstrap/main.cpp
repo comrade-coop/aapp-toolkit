@@ -16,7 +16,7 @@ using json = nlohmann::json;
 
 using namespace std;
 
-const int PORT = 1234;
+const int PORT = 12345;
 
 // Reads from the client socket until the end-of-headers marker ("\r\n\r\n") is found.
 string readHeaders(int client_socket) {
@@ -79,15 +79,15 @@ void sendResponse(int client_socket, const string &response) {
     }
 }
 
-// Reads the content of "jwt.json" from the current working directory.
-string readJwtToken() {
-    ifstream jwtFile("jwt.json");
-    if (!jwtFile) {
+// Reads the content of "csr.txt" from the current working directory.
+string readCSR() {
+    ifstream csrFile("csr.txt");
+    if (!csrFile) {
         cerr << "Warning: Could not open jwt.json" << endl;
         return "";
     }
     ostringstream ss;
-    ss << jwtFile.rdbuf();
+    ss << csrFile.rdbuf();
     string token = ss.str();
     if (!token.empty() && token.back() == '\n')
         token.pop_back();
@@ -178,13 +178,13 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    // Build and send the GET response using the token from jwt.json.
-    string token = readJwtToken();
+    // Build and send the GET response using the csr from csr.txt.
+    string csr = readCSR();
     string get_response =
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: application/json\r\n"
         "\r\n"
-        "{\"token\": \"" + token + "\"}";
+        "{\"csr\": \"" + csr + "\"}";
     sendResponse(client_socket, get_response);
     close(client_socket);
     cout << "GET handled." << endl;
