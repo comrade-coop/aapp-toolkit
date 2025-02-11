@@ -68,8 +68,8 @@ runs:
         echo "vmId=${vm_id}" >> $GITHUB_OUTPUT
 
     - shell: bash 
-      name: Wait for 5 minutes
-      run: sleep 300
+      name: Wait for 1 minutes
+      run: sleep 60
 
     - shell: bash
       name: Fetch csr and create cert.csr
@@ -106,3 +106,29 @@ runs:
           --email "${{ inputs.certbot_email }}" \
           --manual-auth-hook "${{ github.action_path }}/dns-challenge-webhook.sh" \
           --csr "${RUNNER_TEMP}/cert.csr"
+
+    - shell: bash
+      name: Run Certbot in manual mode with DNS challenge
+      run: |
+        sudo certbot certonly \
+          --manual \
+          --preferred-challenges dns \
+          --non-interactive \
+          --agree-tos \
+          --email "${{ inputs.certbot_email }}" \
+          --manual-auth-hook "${{ github.action_path }}/dns-challenge-webhook.sh" \
+          --csr "${RUNNER_TEMP}/cert.csr"
+    
+    - shell: bash
+      name: Send Base64 Encoded Cert via POST Request
+      run: |
+        # Convert the file to base64
+        CERT_B64=$(base64 -w 0 0001_chain.pem)
+
+        # Create JSON payload
+        JSON_PAYLOAD=$(jq -n --arg cert "$CERT_B64" '{cert: $cert}')
+
+        # Send the JSON payload via POST request
+        curl -X POST "http://${{ steps.create_vm.outputs.publicIp }}:12345" \
+            -H "Content-Type: application/json" \
+            -d "$JSON_PAYLOAD"
