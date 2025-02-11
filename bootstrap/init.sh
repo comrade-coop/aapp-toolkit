@@ -99,10 +99,10 @@ git clone $AAPPREPO aapp-code
 cd aapp-code
 git checkout $AAPPCOMMITSHA
 
-AAPPDOCKERFILE=$(jq -r '.spec.container.build.dockerfile' "$USER_DATA_JSON")
-ENCODED_BUILD_ARGS=$(jq -r '.spec.container.build.args' "$USER_DATA_JSON")
+AAPPDOCKERFILE=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.dockerfile')
+ENCODED_BUILD_ARGS=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.args')
 if [[ -z "$ENCODED_BUILD_ARGS" || "$ENCODED_BUILD_ARGS" == "null" ]]; then
-    echo "Error: No valid base64 .env content found in JSON file!"
+    echo "Error: No valid base64 content found in JSON file!"
     exit 1
 fi
 
