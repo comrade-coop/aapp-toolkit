@@ -70,12 +70,12 @@ AAPPCOMMITSHA=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.tag')
 AAPPJOB=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.job')
 
 sed -i "s|__AAPPHOSTNAME__|${DNS_ROOT}|g" "$NGINX_CONFIG"
-sed -i "s|__AAPPPORT__|${AAPPREPO%.git}|g" "$NGINX_CONFIG"
-sed -i "s|__AAPPREPO__|${AAPPREPO}|g" "$NGINX_CONFIG"
+sed -i "s|__AAPPPORT__|${AAPPPORT}|g" "$NGINX_CONFIG"
+sed -i "s|__AAPPREPO__|${AAPPREPO%.git}|g" "$NGINX_CONFIG"
 sed -i "s|__AAPPCOMMITSHA__|${AAPPCOMMITSHA}|g" "$NGINX_CONFIG"
 sed -i "s|__AAPPJOB__|${AAPPJOB}|g" "$NGINX_CONFIG"
 
-cp aazure-attestation/scripts/token.sh /var/www/html/
+cp azure-attestation/scripts/token.sh /var/www/html/
 chmod +x /var/www/html/token.sh
 cp azure-attestation/web/index.html /var/www/html/
 chown www-data:www-data /var/www/html/*
