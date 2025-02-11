@@ -73,6 +73,19 @@
           "destinationAddressPrefix": "*",
           "destinationPortRange": "443"
         }
+      },
+      {
+        "name": "Custom",
+        "properties": {
+          "priority": 340,
+          "protocol": "TCP",
+          "access": "Allow",
+          "direction": "Inbound",
+          "sourceAddressPrefix": "*",
+          "sourcePortRange": "*",
+          "destinationAddressPrefix": "*",
+          "destinationPortRange": "12345"
+        }
       }
     ],
     "subnetRef": "[concat(parameters('virtualNetworkId'), '/subnets/', parameters('subnetName'))]",
