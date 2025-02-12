@@ -35,6 +35,9 @@ inputs:
   certbot_email:
     description: 'Email for certbot certificate issuing'
     required: true
+  current_job_url:
+    description: 'Link to the logs of the current GitHub job'
+    required: true
 outputs:
   vm_id:
     description: 'The unique identifier of the created VM'
@@ -117,13 +120,17 @@ runs:
     - shell: bash
       name: Send Base64 Encoded Cert via POST Request
       run: |
-        # Convert the file to base64
         CERT_B64=$(base64 -w 0 0001_chain.pem)
 
-        # Create JSON payload
-        JSON_PAYLOAD=$(jq -n --arg cert "$CERT_B64" '{cert: $cert}')
+        REFERENCE_JSON=$(sed \
+            -e "s/__VMID__/${{ steps.create_vm.outputs.vmId }}/g" \
+            -e "s/__AAPPRUNURL__/${{ inputs.current_job_url }}/g" \
+            reference.json)
+        REFERENCE_B64=$(echo -n "$REFERENCE_JSON" | base64 -w 0)
 
-        # Send the JSON payload via POST request
+        # Create JSON payload with both cert and reference
+        JSON_PAYLOAD=$(jq -n --arg cert "$CERT_B64" --arg reference "$REFERENCE_B64" '{cert: $cert, reference: $reference}')
+
         curl -X POST "http://${{ steps.create_vm.outputs.publicIp }}:12345" \
             -H "Content-Type: application/json" \
             -d "$JSON_PAYLOAD"

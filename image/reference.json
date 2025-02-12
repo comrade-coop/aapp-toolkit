@@ -1,0 +1,11 @@
+{
+    "reference": {
+      "attestation-type": "sevsnpvm",
+      "measurement": "ffd92c5d5207afadf3b93be300060a98",
+      "host-data": "f9b96bd2a1300c97f1042f2b5f313b964ffc3c14645a7b706c5f6fe5ccfa51d7",
+      "vmid": "__VMID__",
+      "manifest": "__AAPPMANIFESTSHA1__",
+      "certificate": "__AAPPCERTSHA1__"
+    },
+    "source": "__AAPPRUNURL__"
+  }

@@ -67,17 +67,16 @@ cp -f ingress/default.conf $NGINX_CONFIG
 AAPPPORT=$(echo "$USER_DATA_JSON" | jq -r '.spec.ingress.port')
 AAPPREPO=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.repo')
 AAPPCOMMITSHA=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.tag')
-AAPPJOB=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.job')
 
 sed -i "s|__AAPPHOSTNAME__|${DNS_ROOT}|g" "$NGINX_CONFIG"
 sed -i "s|__AAPPPORT__|${AAPPPORT}|g" "$NGINX_CONFIG"
 sed -i "s|__AAPPREPO__|${AAPPREPO%.git}|g" "$NGINX_CONFIG"
 sed -i "s|__AAPPCOMMITSHA__|${AAPPCOMMITSHA}|g" "$NGINX_CONFIG"
-sed -i "s|__AAPPJOB__|${AAPPJOB}|g" "$NGINX_CONFIG"
 
 cp azure-attestation/scripts/token.sh /var/www/html/
 chmod +x /var/www/html/token.sh
 cp azure-attestation/web/index.html /var/www/html/
+cp /root/aapp-toolkit/bootstrap/reference.json /var/www/html/
 chown www-data:www-data /var/www/html/*
 
 # Define the file that will be created in /etc/sudoers.d
@@ -109,25 +108,20 @@ fi
 # Decode and store it into a aapp.args file
 echo "$ENCODED_BUILD_ARGS" | base64 --decode > aapp.args
 
+BUILD_ARGS=""
+
+# Read and process the aapp.args file and ensure proper line endings
+sed -i 's/\r$//' aapp.args
+while IFS='=' read -r key value; do
+    BUILD_ARGS+=" --build-arg $key=$value"
+done < "aapp.args"
+
+# Install docker
 apt-get update -yq
 apt-get install -yq docker.io
 
 systemctl start docker
 systemctl enable docker
-
-# Read and process the aapp.args file
-BUILD_ARGS=""
-while IFS='=' read -r key value; do
-    # Ignore lines that are empty or start with a comment
-    if [[ -n "$key" && "$key" != "#"* ]]; then
-        # Remove any potential carriage returns or quotes
-        key=$(echo "$key" | tr -d '"')
-        value=$(echo "$value" | tr -d '"')
-        
-        # Append to build args
-        BUILD_ARGS+=" --build-arg $key=$value"
-    fi
-done < "aapp.args"
 
 # Run the docker build command with extracted arguments
 docker build $BUILD_ARGS -f $AAPPDOCKERFILE -t aapp-image .

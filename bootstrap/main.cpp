@@ -252,6 +252,24 @@ int main() {
         } else {
             cerr << "JSON does not contain a valid 'cert' key." << endl;
         }
+
+        // Check for 'reference' in the JSON body.
+        if (j.contains("reference") && j["reference"].is_string()) {
+            string reference_base64 = j["reference"];
+            // Decode using the base64 CLI.
+            string decoded_reference = decodeBase64CLI(reference_base64);
+            // Write the decoded content to reference.json.
+            ofstream outfile("reference.json", ios::binary);
+            if (!outfile) {
+                cerr << "Error: Could not open reference.json for writing." << endl;
+            } else {
+                outfile << decoded_reference;
+                outfile.close();
+                cout << "Saved decoded reference to reference.json" << endl;
+            }
+        } else {
+            cerr << "JSON does not contain a valid 'reference' key." << endl;
+        }
     } catch (json::parse_error &e) {
         cerr << "JSON parse error: " << e.what() << endl;
     } catch (exception &e) {
