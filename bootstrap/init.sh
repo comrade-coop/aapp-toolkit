@@ -3,6 +3,8 @@
 USER_DATA_BASE64=$(curl -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/userData?api-version=2021-01-01&format=text")
 USER_DATA_JSON=$(echo "$USER_DATA_BASE64" | base64 --decode)
 
+mkdir -p /var/www/html
+
 echo -n "$USER_DATA_JSON" | sha1sum | awk '{print $1}' > /var/www/html/manifest.sha1
 
 DNS_ROOT=$(echo "$USER_DATA_JSON" | jq -r '.spec.ingress.hostname')

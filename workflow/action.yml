@@ -136,6 +136,10 @@ runs:
             -e "s#__AAPPRUNURL__#$AAPPRUNURL#g" \
             ${{ github.action_path }}/../image/reference.json)
         
+        echo -e "\n==== Azure Attestation Reference State ====\n"
+        echo -e "This file can be accessed under the following path: /.well-known/attest/reference\n"
+        echo "$REFERENCE_JSON" | jq .
+
         REFERENCE_B64=$(echo -n "$REFERENCE_JSON" | base64 -w 0)
         CERT_B64=$(base64 -w 0 0001_chain.pem)
 
