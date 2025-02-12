@@ -171,12 +171,28 @@
             return results;
         }
 
-        function displayReferenceChecks(checks, outputDiv) {
+        function displayReferenceChecks(checks, outputDiv, referenceState) {
             const section = document.createElement('div');
             section.className = 'claim-section reference-checks';
             section.innerHTML = `
                 <h3>Reference Data Checks</h3>
                 <p class="description">Verification of runtime values against expected reference values.</p>
+                ${referenceState?.source ? `
+                <div class="reference-source">
+                    <div class="reference-source-header">
+                        <svg class="source-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                        <span>Reference values from verified build:</span>
+                    </div>
+                    <a href="${referenceState.source}" target="_blank" rel="noopener noreferrer" class="reference-source-link">
+                        ${referenceState.source}
+                        <svg class="external-link-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>
+                        </svg>
+                    </a>
+                </div>
+                ` : ''}
             `;
             
             checks.forEach(check => {
@@ -743,7 +759,7 @@
                         // Add reference checks right after timestamps section
                         if (claims && referenceState?.reference) {
                             const referenceChecks = performReferenceChecks(claims, referenceState.reference);
-                            displayReferenceChecks(referenceChecks, outputDiv);
+                            displayReferenceChecks(referenceChecks, outputDiv, referenceState);
                         }
                     }
                 } else {
@@ -1259,6 +1275,59 @@
 
         .timeline-value .timestamp {
             margin: 0;
+        }
+
+        .reference-source {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .reference-source-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #4a5568;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .source-icon {
+            color: #4a5568;
+        }
+
+        .reference-source-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #3182ce;
+            text-decoration: none;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.9em;
+            padding: 6px 10px;
+            background: rgba(0,0,0,0.03);
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            word-break: break-all;
+        }
+
+        .reference-source-link:hover {
+            background: rgba(0,0,0,0.05);
+            color: #2c5282;
+        }
+
+        .external-link-icon {
+            color: currentColor;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+
+        .reference-source-link:hover .external-link-icon {
+            opacity: 1;
         }
     </style>
 </head>
