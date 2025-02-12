@@ -7,6 +7,69 @@
     <script type="module">
         import { jwtVerify } from 'https://cdn.skypack.dev/jose';
 
+        async function validateJWT() {
+            try {
+                // Store referenceState in a higher scope
+                const referenceState = await fetchReferenceState();
+                if (!referenceState) {
+                    throw new Error("Failed to fetch reference state");
+                }
+
+                const nonce = generateNonce();
+                const jwtToken = await fetchToken(nonce);
+                if (!jwtToken) {
+                    throw new Error("Failed to fetch token");
+                }
+
+                const header = decodeJwtHeader(jwtToken);
+                if (!header.jku || !header.kid) {
+                    throw new Error("Missing jku or kid in token header");
+                }
+
+                if (header.alg !== 'RS256') {
+                    throw new Error(`Unsupported algorithm: ${header.alg}`);
+                }
+
+                const key = await fetchPublicKey(header.jku, header.kid);
+                const { payload, protectedHeader } = await jwtVerify(jwtToken, key, {
+                    algorithms: ['RS256']
+                });
+                
+                const now = Math.floor(Date.now() / 1000);
+                const isExpired = payload.exp < now;
+
+                // Pass both the claims and referenceState to displayClaims
+                displayClaims(payload, {
+                    isValidSignature: true,
+                    isExpired: isExpired
+                }, referenceState);
+
+            } catch (error) {
+                const errorMessage = error.code === 'ERR_JWS_VERIFICATION_FAILED' 
+                    ? "Signature verification failed" 
+                    : error.message;
+                
+                displayClaims(null, {
+                    isValidSignature: false,
+                    errorMessage: `Verification Error: ${errorMessage}`
+                }, null);
+                console.error("JWT Validation Error:", error);
+            }
+        }
+
+        window.onload = validateJWT;
+
+        // Clean up interval when page is unloaded
+        window.addEventListener('unload', () => {
+            if (window.timeUpdateInterval) {
+                clearInterval(window.timeUpdateInterval);
+            }
+        });
+
+        //===============================================
+        // Implimentation functions
+        //===============================================
+
         async function fetchToken(nonce) {
             try {
                 const response = await fetch(`/.well-known/attest/token?nonce=${nonce}`);
@@ -33,16 +96,6 @@
             }
         }
 
-        function decodeJwtHeader(token) {
-            try {
-                const [header] = token.split(".");
-                return JSON.parse(atob(header));
-            } catch (error) {
-                console.error("Error decoding JWT header:", error);
-                throw new Error("Invalid JWT header");
-            }
-        }
-
         async function fetchPublicKey(jku, kid) {
             try {
                 const response = await fetch(jku);
@@ -63,6 +116,116 @@
             } catch (error) {
                 console.error("Error fetching public key:", error);
                 throw new Error("Failed to import public key");
+            }
+        }
+
+        function performReferenceChecks(claims, reference) {
+            const results = [];
+
+            // Check 1: reference.measurement + reference.host-data equals x-ms-sevsnpvm-launchmeasurement
+            const expectedLaunchMeasurement = ((reference.measurement || "") + (reference["host-data"] || "")).toLowerCase();
+            const actualLaunchMeasurement = (claims["x-ms-isolation-tee"]?.["x-ms-sevsnpvm-launchmeasurement"] || "").toLowerCase();
+            results.push({
+                description: "Launch Measurement Check",
+                expected: expectedLaunchMeasurement,
+                actual: actualLaunchMeasurement,
+                valid: expectedLaunchMeasurement === actualLaunchMeasurement
+            });
+
+            // Check 2: reference.vmid equals x-ms-azurevm-vmid
+            const expectedVmid = (reference.vmid || "").toLowerCase();
+            const actualVmid = (claims["x-ms-azurevm-vmid"] || "").toLowerCase();
+            results.push({
+                description: "VM ID Check",
+                expected: expectedVmid,
+                actual: actualVmid,
+                valid: expectedVmid === actualVmid
+            });
+
+            // Check 3: reference.manifest equals base64decoded x-ms-runtime.client-payload.manifest
+            const encodedManifest = claims["x-ms-runtime"] && claims["x-ms-runtime"]["client-payload"]
+                                    ? claims["x-ms-runtime"]["client-payload"].manifest
+                                    : "";
+            const decodedManifest = base64Decode(encodedManifest).toLowerCase();
+            const expectedManifest = (reference.manifest || "").toLowerCase();
+            results.push({
+                description: "Manifest Check",
+                expected: expectedManifest,
+                actual: decodedManifest,
+                valid: expectedManifest === decodedManifest
+            });
+
+            // Check 4: reference.certificate equals base64decoded x-ms-runtime.client-payload.cert
+            const encodedCert = claims["x-ms-runtime"] && claims["x-ms-runtime"]["client-payload"]
+                                ? claims["x-ms-runtime"]["client-payload"].cert
+                                : "";
+            const decodedCert = base64Decode(encodedCert).toLowerCase();
+            const expectedCert = (reference.certificate || "").toLowerCase();
+            results.push({
+                description: "Certificate Check",
+                expected: expectedCert,
+                actual: decodedCert,
+                valid: expectedCert === decodedCert
+            });
+
+            return results;
+        }
+
+        function displayReferenceChecks(checks, outputDiv) {
+            const section = document.createElement('div');
+            section.className = 'claim-section reference-checks';
+            section.innerHTML = `
+                <h3>Reference Data Checks</h3>
+                <p class="description">Verification of runtime values against expected reference values.</p>
+            `;
+            
+            checks.forEach(check => {
+                const resultBadge = document.createElement('span');
+                resultBadge.className = `security-status ${check.valid ? 'valid' : 'invalid'}`;
+                resultBadge.innerText = check.valid ? 'PASS' : 'FAIL';
+                
+                const checkDiv = document.createElement('div');
+                checkDiv.className = 'check-item';
+                checkDiv.innerHTML = `
+                    <div>${resultBadge.outerHTML} <strong>${check.description}</strong></div>
+                    <div class="values-container">
+                        <div class="value-row">
+                            <span class="value-label">Expected:</span>
+                            <span class="value-content">${check.expected || '(empty)'}</span>
+                        </div>
+                        <div class="value-row">
+                            <span class="value-label">Actual:</span>
+                            <span class="value-content">${check.actual || '(empty)'}</span>
+                        </div>
+                    </div>
+                `;
+                section.appendChild(checkDiv);
+            });
+            outputDiv.appendChild(section);
+        }
+
+        function generateNonce(length = 32) {
+            const array = new Uint8Array(length);
+            window.crypto.getRandomValues(array);
+            return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+
+        function base64Decode(input) {
+            try {
+                return atob(input);
+            } catch(e) {
+                console.error("Error decoding base64:", e);
+                return "";
+            }
+        }
+
+        function decodeJwtHeader(token) {
+            try {
+                const [header] = token.split(".");
+                return JSON.parse(atob(header));
+            } catch (error) {
+                console.error("Error decoding JWT header:", error);
+                throw new Error("Invalid JWT header");
             }
         }
 
@@ -294,7 +457,262 @@
             }, 1000);
         }
 
-        function displayClaims(claims, validation) {
+        // Define human readable labels for claims
+        const humanLabels = {
+            exp: { label: "Expiration Time", description: "The time when the token expires." },
+            iat: { label: "Issued At", description: "The time when the token was issued." },
+            nbf: { label: "Not Valid Before", description: "The token is not valid before this time." },
+            secureboot: { label: "Secure Boot", description: "Indicates whether secure boot is enabled on the VM." },
+            "x-ms-azurevm-vmid": { label:"VM ID", description:"Unique identifier for the virtual machine." },
+            "x-ms-azurevm-osbuild": { label:"OS Build", description:"OS build information." },
+            "x-ms-azurevm-osdistro": { label:"OS Distribution", description:"Name of the OS distribution." },
+            "x-ms-azurevm-ostype": { label:"OS Type", description:"Operating system type." },
+            "x-ms-azurevm-osversion-major": { label:"OS Version (Major)", description:"Major version number of the OS." },
+            "x-ms-azurevm-osversion-minor": { label:"OS Version (Minor)", description:"Minor version number of the OS." },
+            "x-ms-azurevm-is-windows": { label:"Windows OS", description:"Indicates if the virtual machine is running Windows operating system." },
+            "x-ms-azurevm-dbvalidated": { label:"DB Validation", description:"Indicates if the DB component has been validated." },
+            "x-ms-azurevm-dbxvalidated": { label:"DBX Validation", description:"Indicates if the DBX component has been validated." },
+            "x-ms-azurevm-default-securebootkeysvalidated": { label:"Secure Boot Keys Validated", description:"Indicates if secure boot keys have been validated." },
+            "x-ms-azurevm-hypervisordebug-enabled": { label:"Hypervisor Debugging", description:"Indicates if hypervisor debugging is enabled." },
+            "x-ms-azurevm-bootdebug-enabled": { label:"Boot Debugging", description:"Indicates if boot debugging is enabled on the VM." },
+            "x-ms-azurevm-debuggersdisabled": { label:"Debuggers Disabled", description:"Indicates if debuggers are disabled." },
+            "x-ms-azurevm-kerneldebug-enabled": { label:"Kernel Debugging", description:"Indicates if kernel debugging is enabled." },
+            "x-ms-azurevm-flightsigning-enabled": { label:"Flight Signing", description:"Indicates if flight signing is enabled." },
+            "x-ms-azurevm-testsigning-enabled": { label:"Test Signing", description:"Indicates if test signing is enabled." },
+            "x-ms-azurevm-signingdisabled": { label:"Signing Disabled", description:"Indicates if secure signing is disabled on the VM." },
+            "x-ms-azurevm-elam-enabled": { label:"ELAM Protection", description:"Indicates if ELAM (Early Launch Anti-Malware) is enabled." },
+            "x-ms-azurevm-hvci-policy": { label:"HVCI Policy", description:"Hypervisor Code Integrity (HVCI) policy value." },
+            "x-ms-azurevm-attestation-type": { label:"Attestation Type", description:"The type of attestation used for the VM." },
+            "x-ms-azurevm-attestation-protocol-ver": { label:"Attestation Protocol Version", description:"Version of the attestation protocol used." },
+            "x-ms-azurevm-attested-pcrs": { label:"Attested PCRs", description:"List of PCRs (Platform Configuration Registers) attested." },
+            "x-ms-policy-hash": { label:"Policy Hash", description:"Hash representing the attestation policy configuration." },
+            "x-ms-runtime": { label:"Runtime Information", description:"Attestation runtime­-related information." }
+        };
+
+        // Define sections configuration
+        const sections = {
+            'timestamps': ['exp', 'iat', 'nbf'],
+            'vmConfig': key => key.startsWith('x-ms-azurevm'),
+            'isolationTee': key => key.startsWith('x-ms-isolation-tee'),
+            'runtimeInfo': key => key.startsWith('x-ms-runtime'),
+            'securityPolicy': ['x-ms-policy-hash', 'secureboot']
+        };
+
+        // Define section headings
+        const sectionHeadings = {
+            timestamps: { 
+                label: "Token Validity", 
+                description: "Timestamps related to token validity." 
+            },
+            vmConfig: { 
+                label: "Virtual Machine Configuration", 
+                description: "Configuration information specific to the Azure VM." 
+            },
+            isolationTee: { 
+                label: "Isolation TEE Data", 
+                description: "Detailed data from the Trusted Execution Environment." 
+            },
+            runtimeInfo: { 
+                label: "Attestation Runtime Information", 
+                description: "Runtime properties associated with the attestation." 
+            },
+            securityPolicy: { 
+                label: "Security Policy", 
+                description: "Security settings and policy hash." 
+            }
+        };
+
+        // Define labels for Isolation TEE Data
+        const isolationTeeLabels = {
+            "x-ms-attestation-type": { 
+                label: "Attestation Type", 
+                description: "The type of isolation used for the virtual machine",
+                format: value => createSecurityBadge(value).outerHTML
+            },
+            "x-ms-compliance-status": { 
+                label: "Compliance Status", 
+                description: "Compliance status of the virtual machine",
+                format: value => createSecurityBadge(value).outerHTML
+            },
+            "x-ms-runtime": {
+                label: "Runtime Configuration",
+                description: "Runtime configuration and keys for the TEE environment",
+                nested: {
+                    "keys": { 
+                        label: "Security Keys", 
+                        description: "Cryptographic keys used in the TEE",
+                        nested: {
+                            "e": { label: "Exponent", format: value => formatValue(value, 'e') },
+                            "key_ops": { label: "Operations", format: value => formatValue(value, 'key_ops') },
+                            "kid": { label: "Key ID", format: value => formatValue(value, 'kid') },
+                            "kty": { label: "Key Type", format: value => formatValue(value, 'kty') },
+                            "n": { label: "Modulus", format: value => formatValue(value, 'n') }
+                        }
+                    },
+                    "user-data": { 
+                        label: "User Data", 
+                        description: "User-specific data in the TEE",
+                        format: value => formatValue(value, 'user-data')
+                    },
+                    "vm-configuration": { 
+                        label: "VM Configuration", 
+                        description: "Virtual machine configuration settings",
+                        nested: {
+                            "console-enabled": { 
+                                label: "Console Enabled", 
+                                description: "Whether console access is enabled",
+                                format: value => createSecurityBadge(value).outerHTML
+                            },
+                            "secure-boot": { 
+                                label: "Secure Boot", 
+                                description: "Whether secure boot is enabled",
+                                format: value => createSecurityBadge(value).outerHTML
+                            },
+                            "tpm-enabled": { 
+                                label: "TPM Enabled", 
+                                description: "Whether TPM is enabled",
+                                format: value => createSecurityBadge(value).outerHTML
+                            },
+                            "vmUniqueId": { 
+                                label: "VM Unique ID", 
+                                description: "Unique identifier for the virtual machine",
+                                format: value => formatValue(value, 'vmUniqueId')
+                            }
+                        }
+                    }
+                }
+            },
+            "x-ms-sevsnpvm-authorkeydigest": { 
+                label: "Author Key Digest", 
+                description: "Cryptographic digest of the attestation author key",
+                format: value => formatValue(value, 'authorkeydigest')
+            },
+            "x-ms-sevsnpvm-bootloader-svn": { 
+                label: "Bootloader Version", 
+                description: "Security Version Number of the bootloader",
+                format: value => formatValue(value, 'bootloader-svn')
+            },
+            "x-ms-sevsnpvm-familyId": { 
+                label: "Family ID", 
+                description: "Identifier for the VM family",
+                format: value => formatValue(value, 'familyId')
+            },
+            "x-ms-sevsnpvm-guestsvn": { 
+                label: "Guest Version", 
+                description: "Security Version Number of the guest OS",
+                format: value => formatValue(value, 'guestsvn')
+            },
+            "x-ms-sevsnpvm-hostdata": { 
+                label: "Host Data", 
+                description: "Data provided by the host system",
+                format: value => formatValue(value, 'hostdata')
+            },
+            "x-ms-sevsnpvm-idkeydigest": { 
+                label: "ID Key Digest", 
+                description: "Cryptographic digest of the identity key",
+                format: value => formatValue(value, 'idkeydigest')
+            },
+            "x-ms-sevsnpvm-imageId": { 
+                label: "Image ID", 
+                description: "Identifier for the VM image",
+                format: value => formatValue(value, 'imageId')
+            },
+            "x-ms-sevsnpvm-is-debuggable": { 
+                label: "Debuggable", 
+                description: "Whether the system is in debug mode",
+                format: value => createSecurityBadge(value).outerHTML
+            },
+            "x-ms-sevsnpvm-launchmeasurement": { 
+                label: "Launch Measurement", 
+                description: "Cryptographic measurement taken at launch time",
+                format: value => formatValue(value, 'launchmeasurement')
+            },
+            "x-ms-sevsnpvm-microcode-svn": { 
+                label: "Microcode Version", 
+                description: "Security Version Number of the CPU microcode",
+                format: value => formatValue(value, 'microcode-svn')
+            },
+            "x-ms-sevsnpvm-migration-allowed": { 
+                label: "Migration Allowed", 
+                description: "Whether VM migration is allowed",
+                format: value => createSecurityBadge(value).outerHTML
+            },
+            "x-ms-sevsnpvm-reportdata": { 
+                label: "Report Data", 
+                description: "Raw attestation report data",
+                format: value => formatValue(value, 'reportdata')
+            },
+            "x-ms-sevsnpvm-reportid": { 
+                label: "Report ID", 
+                description: "Unique identifier for this attestation report",
+                format: value => formatValue(value, 'reportid')
+            },
+            "x-ms-sevsnpvm-smt-allowed": { 
+                label: "SMT Allowed", 
+                description: "Whether Simultaneous Multi-Threading is allowed",
+                format: value => createSecurityBadge(value).outerHTML
+            },
+            "x-ms-sevsnpvm-snpfw-svn": { 
+                label: "SNP Firmware Version", 
+                description: "Security Version Number of the SNP firmware",
+                format: value => formatValue(value, 'snpfw-svn')
+            },
+            "x-ms-sevsnpvm-tee-svn": { 
+                label: "TEE Version", 
+                description: "Security Version Number of the Trusted Execution Environment",
+                format: value => formatValue(value, 'tee-svn')
+            },
+            "x-ms-sevsnpvm-vmpl": { 
+                label: "VM Privilege Level", 
+                description: "Current privilege level of the virtual machine",
+                format: value => formatValue(value, 'vmpl')
+            }
+        };
+
+        // Helper function to create claim group
+        function createClaimGroup(key, value, sectionName) {
+            const group = document.createElement('div');
+            group.className = 'claim-group';
+            const label = humanLabels[key]?.label || key;
+            const desc = humanLabels[key]?.description || '';
+
+            if (key === 'x-ms-azurevm-attested-pcrs' && Array.isArray(value)) {
+                group.innerHTML = `
+                    <div><strong>${label}:</strong></div>
+                    <div class="pcr-list">
+                        ${value.map(pcr => `<div class="pcr-item">PCR ${pcr}</div>`).join('')}
+                    </div>
+                    ${desc ? `<div class="description">${desc}</div>` : ''}
+                `;
+            } else if (typeof value === 'object' && value !== null) {
+                group.innerHTML = `<div><strong>${label}:</strong></div>`;
+                if (sectionName === 'isolationTee') {
+                    group.appendChild(formatNestedObject(value, 0, isolationTeeLabels));
+                } else {
+                    group.appendChild(formatNestedObject(value));
+                }
+                if (desc) {
+                    group.innerHTML += `<div class="description">${desc}</div>`;
+                }
+            } else {
+                let formattedValue = formatValue(value, key);
+                if (typeof value === 'boolean') {
+                    formattedValue = createSecurityBadge(value).outerHTML;
+                }
+                
+                group.innerHTML = `
+                    <div>
+                        <strong>${label}:</strong>
+                        <div class="claim-value">${formattedValue}</div>
+                        ${desc ? `<div class="description">${desc}</div>` : ''}
+                    </div>
+                `;
+            }
+
+            return group;
+        }
+
+        function displayClaims(claims, validation, referenceState) {
             const outputDiv = document.getElementById('output');
             outputDiv.innerHTML = '';
 
@@ -311,10 +729,39 @@
                 return;
             }
 
-            // Create validity banner with separate statuses
-            const validityBanner = document.createElement('div');
-            validityBanner.className = `claim-section ${validation.isValidSignature ? 'valid' : 'invalid'}`;
-            validityBanner.innerHTML = `
+            // Create validity banner
+            const validityBanner = createValidityBanner(claims, validation);
+            outputDiv.appendChild(validityBanner);
+
+            // Process sections in order
+            Object.entries(sections).forEach(([sectionName, matcher]) => {
+                if (sectionName === 'timestamps') {
+                    const timestampSection = createTimestampSection(claims, sectionName, matcher);
+                    if (timestampSection) {
+                        outputDiv.appendChild(timestampSection);
+
+                        // Add reference checks right after timestamps section
+                        if (claims && referenceState?.reference) {
+                            const referenceChecks = performReferenceChecks(claims, referenceState.reference);
+                            displayReferenceChecks(referenceChecks, outputDiv);
+                        }
+                    }
+                } else {
+                    const section = createSection(claims, sectionName, matcher);
+                    if (section) {
+                        outputDiv.appendChild(section);
+                    }
+                }
+            });
+
+            startTimerUpdates();
+        }
+
+        // Helper function to create validity banner
+        function createValidityBanner(claims, validation) {
+            const banner = document.createElement('div');
+            banner.className = `claim-section ${validation.isValidSignature ? 'valid' : 'invalid'}`;
+            banner.innerHTML = `
                 <h3 style="margin:0">Attestation Result: 
                     <span class="security-status">${validation.isValidSignature ? 'VALID SIGNATURE' : 'INVALID SIGNATURE'}</span>
                     ${validation.isExpired ? '<span class="security-status expired">(EXPIRED)</span>' : ''}
@@ -322,417 +769,99 @@
                 <div class="issuer-url">Issuing Authority: <a href="${claims.iss}" target="_blank">${claims.iss}</a></div>
                 <p class="description">Signature verification ${validation.isValidSignature ? 'succeeded' : 'failed'}${validation.isExpired ? ' but token has expired' : ''}.</p>
             `;
-            outputDiv.appendChild(validityBanner);
-
-            // Human readable labels for individual claims
-            const humanLabels = {
-                exp: { label: "Expiration Time", description: "The time when the token expires." },
-                iat: { label: "Issued At", description: "The time when the token was issued." },
-                nbf: { label: "Not Valid Before", description: "The token is not valid before this time." },
-                secureboot: { label: "Secure Boot", description: "Indicates whether secure boot is enabled on the VM." },
-                "x-ms-azurevm-vmid": { label:"VM ID", description:"Unique identifier for the virtual machine." },
-                "x-ms-azurevm-osbuild": { label:"OS Build", description:"OS build information." },
-                "x-ms-azurevm-osdistro": { label:"OS Distribution", description:"Name of the OS distribution." },
-                "x-ms-azurevm-ostype": { label:"OS Type", description:"Operating system type." },
-                "x-ms-azurevm-osversion-major": { label:"OS Version (Major)", description:"Major version number of the OS." },
-                "x-ms-azurevm-osversion-minor": { label:"OS Version (Minor)", description:"Minor version number of the OS." },
-                "x-ms-azurevm-is-windows": { label:"Windows OS", description:"Indicates if the virtual machine is running Windows operating system." },
-                "x-ms-azurevm-dbvalidated": { label:"DB Validation", description:"Indicates if the DB component has been validated." },
-                "x-ms-azurevm-dbxvalidated": { label:"DBX Validation", description:"Indicates if the DBX component has been validated." },
-                "x-ms-azurevm-default-securebootkeysvalidated": { label:"Secure Boot Keys Validated", description:"Indicates if secure boot keys have been validated." },
-                "x-ms-azurevm-hypervisordebug-enabled": { label:"Hypervisor Debugging", description:"Indicates if hypervisor debugging is enabled." },
-                "x-ms-azurevm-elam-enabled": { label:"ELAM Protection", description:"Indicates if ELAM (Early Launch Anti-Malware) is enabled." },
-                "x-ms-azurevm-hvci-policy": { label:"HVCI Policy", description:"Hypervisor Code Integrity (HVCI) policy value." },
-                "x-ms-azurevm-bootdebug-enabled": { label:"Boot Debugging", description:"Indicates if boot debugging is enabled on the VM." },
-                "x-ms-azurevm-debuggersdisabled": { label:"Debuggers Disabled", description:"Indicates if debuggers are disabled." },
-                "x-ms-azurevm-kerneldebug-enabled": { label:"Kernel Debugging", description:"Indicates if kernel debugging is enabled." },
-                "x-ms-azurevm-flightsigning-enabled": { label:"Flight Signing", description:"Indicates if flight signing is enabled." },
-                "x-ms-azurevm-testsigning-enabled": { label:"Test Signing", description:"Indicates if test signing is enabled." },
-                "x-ms-azurevm-signingdisabled": { label:"Signing Disabled", description:"Indicates if secure signing is disabled on the VM." },
-                "x-ms-azurevm-attestation-type": { label:"Attestation Type", description:"The type of attestation used for the VM." },
-                "x-ms-azurevm-attestation-protocol-ver": { label:"Attestation Protocol Version", description:"Version of the attestation protocol used." },
-                "x-ms-azurevm-attested-pcrs": { label:"Attested PCRs", description:"List of PCRs (Platform Configuration Registers) attested." },
-                "x-ms-policy-hash": { label:"Policy Hash", description:"Hash representing the attestation policy configuration." },
-                "x-ms-runtime": { label:"Runtime Information", description:"Attestation runtime­-related information." }
-            };
-
-            // Human readable section headings
-            const sectionHeadings = {
-                timestamps: { label: "Token Validity", description: "Timestamps related to token validity." },
-                vmConfig: { label: "Virtual Machine Configuration", description: "Configuration information specific to the Azure VM." },
-                isolationTee: { label: "Isolation TEE Data", description: "Detailed data from the Trusted Execution Environment." },
-                runtimeInfo: { label: "Attestation Runtime Information", description: "Runtime properties associated with the attestation." },
-                securityPolicy: { label: "Security Policy", description: "Security settings and policy hash." }
-            };
-
-            const sections = {
-                'timestamps': ['exp', 'iat', 'nbf'],
-                'vmConfig': key => key.startsWith('x-ms-azurevm'),
-                'isolationTee': key => key.startsWith('x-ms-isolation-tee'),
-                'runtimeInfo': key => key.startsWith('x-ms-runtime'),
-                'securityPolicy': ['x-ms-policy-hash', 'secureboot']
-            };
-
-            // Human readable labels specific for Isolation TEE Data
-            const isolationTeeLabels = {
-                "x-ms-attestation-type": { 
-                    label: "Attestation Type", 
-                    description: "The type of isolation used for the virtual machine",
-                    format: value => createSecurityBadge(value).outerHTML
-                },
-                "x-ms-compliance-status": { 
-                    label: "Compliance Status", 
-                    description: "Compliance status of the virtual machine",
-                    format: value => createSecurityBadge(value).outerHTML
-                },
-                "x-ms-runtime": {
-                    label: "Runtime Configuration",
-                    description: "Runtime configuration and keys for the TEE environment",
-                    nested: {
-                        "keys": { 
-                            label: "Security Keys", 
-                            description: "Cryptographic keys used in the TEE",
-                            nested: {
-                                "e": { label: "Exponent", format: value => formatValue(value, 'e') },
-                                "key_ops": { label: "Operations", format: value => formatValue(value, 'key_ops') },
-                                "kid": { label: "Key ID", format: value => formatValue(value, 'kid') },
-                                "kty": { label: "Key Type", format: value => formatValue(value, 'kty') },
-                                "n": { label: "Modulus", format: value => formatValue(value, 'n') }
-                            }
-                        },
-                        "user-data": { 
-                            label: "User Data", 
-                            description: "User-specific data in the TEE",
-                            format: value => formatValue(value, 'user-data')
-                        },
-                        "vm-configuration": { 
-                            label: "VM Configuration", 
-                            description: "Virtual machine configuration settings",
-                            nested: {
-                                "console-enabled": { 
-                                    label: "Console Enabled", 
-                                    description: "Whether console access is enabled",
-                                    format: value => createSecurityBadge(value).outerHTML
-                                },
-                                "secure-boot": { 
-                                    label: "Secure Boot", 
-                                    description: "Whether secure boot is enabled",
-                                    format: value => createSecurityBadge(value).outerHTML
-                                },
-                                "tpm-enabled": { 
-                                    label: "TPM Enabled", 
-                                    description: "Whether TPM is enabled",
-                                    format: value => createSecurityBadge(value).outerHTML
-                                },
-                                "vmUniqueId": { 
-                                    label: "VM Unique ID", 
-                                    description: "Unique identifier for the virtual machine",
-                                    format: value => formatValue(value, 'vmUniqueId')
-                                }
-                            }
-                        }
-                    }
-                },
-                "x-ms-sevsnpvm-authorkeydigest": { 
-                    label: "Author Key Digest", 
-                    description: "Cryptographic digest of the attestation author key",
-                    format: value => formatValue(value, 'authorkeydigest')
-                },
-                "x-ms-sevsnpvm-bootloader-svn": { 
-                    label: "Bootloader Version", 
-                    description: "Security Version Number of the bootloader",
-                    format: value => formatValue(value, 'bootloader-svn')
-                },
-                "x-ms-sevsnpvm-familyId": { 
-                    label: "Family ID", 
-                    description: "Identifier for the VM family",
-                    format: value => formatValue(value, 'familyId')
-                },
-                "x-ms-sevsnpvm-guestsvn": { 
-                    label: "Guest Version", 
-                    description: "Security Version Number of the guest OS",
-                    format: value => formatValue(value, 'guestsvn')
-                },
-                "x-ms-sevsnpvm-hostdata": { 
-                    label: "Host Data", 
-                    description: "Data provided by the host system",
-                    format: value => formatValue(value, 'hostdata')
-                },
-                "x-ms-sevsnpvm-idkeydigest": { 
-                    label: "ID Key Digest", 
-                    description: "Cryptographic digest of the identity key",
-                    format: value => formatValue(value, 'idkeydigest')
-                },
-                "x-ms-sevsnpvm-imageId": { 
-                    label: "Image ID", 
-                    description: "Identifier for the VM image",
-                    format: value => formatValue(value, 'imageId')
-                },
-                "x-ms-sevsnpvm-is-debuggable": { 
-                    label: "Debuggable", 
-                    description: "Whether the system is in debug mode",
-                    format: value => createSecurityBadge(value).outerHTML
-                },
-                "x-ms-sevsnpvm-launchmeasurement": { 
-                    label: "Launch Measurement", 
-                    description: "Cryptographic measurement taken at launch time",
-                    format: value => formatValue(value, 'launchmeasurement')
-                },
-                "x-ms-sevsnpvm-microcode-svn": { 
-                    label: "Microcode Version", 
-                    description: "Security Version Number of the CPU microcode",
-                    format: value => formatValue(value, 'microcode-svn')
-                },
-                "x-ms-sevsnpvm-migration-allowed": { 
-                    label: "Migration Allowed", 
-                    description: "Whether VM migration is allowed",
-                    format: value => createSecurityBadge(value).outerHTML
-                },
-                "x-ms-sevsnpvm-reportdata": { 
-                    label: "Report Data", 
-                    description: "Raw attestation report data",
-                    format: value => formatValue(value, 'reportdata')
-                },
-                "x-ms-sevsnpvm-reportid": { 
-                    label: "Report ID", 
-                    description: "Unique identifier for this attestation report",
-                    format: value => formatValue(value, 'reportid')
-                },
-                "x-ms-sevsnpvm-smt-allowed": { 
-                    label: "SMT Allowed", 
-                    description: "Whether Simultaneous Multi-Threading is allowed",
-                    format: value => createSecurityBadge(value).outerHTML
-                },
-                "x-ms-sevsnpvm-snpfw-svn": { 
-                    label: "SNP Firmware Version", 
-                    description: "Security Version Number of the SNP firmware",
-                    format: value => formatValue(value, 'snpfw-svn')
-                },
-                "x-ms-sevsnpvm-tee-svn": { 
-                    label: "TEE Version", 
-                    description: "Security Version Number of the Trusted Execution Environment",
-                    format: value => formatValue(value, 'tee-svn')
-                },
-                "x-ms-sevsnpvm-vmpl": { 
-                    label: "VM Privilege Level", 
-                    description: "Current privilege level of the virtual machine",
-                    format: value => formatValue(value, 'vmpl')
-                }
-            };
-
-            // Process sections in order
-            Object.entries(sections).forEach(([sectionName, matcher]) => {
-                const sectionClaims = Object.entries(claims).filter(([key]) =>
-                    Array.isArray(matcher) ? matcher.includes(key) : matcher(key)
-                );
-
-                if (sectionClaims.length > 0) {
-                    const section = document.createElement('div');
-                    section.className = 'claim-section';
-                    section.innerHTML = `<h3>${sectionHeadings[sectionName]?.label || sectionName}</h3>
-                    <p class="description">${sectionHeadings[sectionName]?.description || ''}</p>`;
-                    
-                    // For vmConfig section, sort claims according to humanLabels order
-                    if (sectionName === 'vmConfig') {
-                        const sortedClaims = Object.keys(humanLabels)
-                            .filter(key => matcher(key) && sectionClaims.some(([k]) => k === key))
-                            .map(key => sectionClaims.find(([k]) => k === key));
-                        sectionClaims.length = 0;
-                        sectionClaims.push(...sortedClaims);
-                    }
-
-                    sectionClaims.forEach(([key, value]) => {
-                        const group = document.createElement('div');
-                        group.className = 'claim-group';
-                        const label = humanLabels[key] ? humanLabels[key].label : key;
-                        const desc = humanLabels[key] ? humanLabels[key].description : '';
-                        
-                        if (key === 'x-ms-azurevm-attested-pcrs' && Array.isArray(value)) {
-                            // Special handling for PCRs list
-                            group.innerHTML = `
-                                <div><strong>${label}:</strong></div>
-                                <div class="pcr-list">
-                                    ${value.map(pcr => `<div class="pcr-item">PCR ${pcr}</div>`).join('')}
-                                </div>
-                            `;
-                        }
-                        else if (['exp', 'iat', 'nbf'].includes(key)) {
-                            group.innerHTML = `<div><strong>${label}:</strong> ${formatTimestamp(value, key)}</div>`;
-                        } else if (typeof value === 'object') {
-                            group.innerHTML = `<div><strong>${label}:</strong></div>`;
-                            if(sectionName === 'isolationTee') {
-                                // Use isolationTeeLabels for improved readability in Isolation TEE Data section
-                                group.appendChild(formatNestedObject(value, 0, isolationTeeLabels));
-                            } else {
-                                group.appendChild(formatNestedObject(value));
-                            }
-                        } else {
-                            group.innerHTML = `<div><strong>${label}:</strong> ${typeof value === 'boolean' ? createSecurityBadge(value).outerHTML : value}</div>`;
-                        }
-                        if(desc) {
-                            group.innerHTML += `<div class="description">${desc}</div>`;
-                        }
-                        section.appendChild(group);
-                    });
-                    outputDiv.appendChild(section);
-                }
-            });
-
-            // Start the timer updates after displaying the claims
-            startTimerUpdates();
+            return banner;
         }
 
-        function generateNonce(length = 32) {
-            const array = new Uint8Array(length);
-            window.crypto.getRandomValues(array);
-            return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-        }
+        // Helper function to create timestamp section
+        function createTimestampSection(claims, sectionName, matcher) {
+            const sectionClaims = Object.entries(claims).filter(([key]) =>
+                Array.isArray(matcher) ? matcher.includes(key) : matcher(key)
+            );
 
-        async function validateJWT() {
-            try {
-                const referenceState = await fetchReferenceState();
+            if (sectionClaims.length === 0) return null;
 
-                console.log(JSON.stringify(referenceState));
-
-                const nonce = generateNonce();
-                const jwtToken = await fetchToken(nonce);
-                const header = decodeJwtHeader(jwtToken);
-                if (!header.jku || !header.kid) throw new Error("Missing jku or kid in token header");
-
-                if (header.alg !== 'RS256') {
-                    throw new Error(`Unsupported algorithm: ${header.alg}`);
-                }
-
-                const key = await fetchPublicKey(header.jku, header.kid);
-                const { payload, protectedHeader } = await jwtVerify(jwtToken, key, {
-                    algorithms: ['RS256']
-                });
-                
-                const now = Math.floor(Date.now() / 1000);
-                const isExpired = payload.exp < now;
-                displayClaims(payload, {
-                    isValidSignature: true,
-                    isExpired: isExpired
-                });
-
-                // NEW: Perform and display reference data checks using proper reference structure
-                if (payload && referenceState && referenceState.reference) {
-                    const referenceData = referenceState.reference;
-                    const referenceChecks = performReferenceChecks(payload, referenceData);
-                    displayReferenceChecks(referenceChecks);
-                }
-                
-            } catch (error) {
-                const errorMessage = error.code === 'ERR_JWS_VERIFICATION_FAILED' 
-                    ? "Signature verification failed" 
-                    : error.message;
-                
-                displayClaims(null, {
-                    isValidSignature: false,
-                    errorMessage: `Verification Error: ${errorMessage}`
-                });
-                console.error("JWT Validation Error:", error);
-            }
-        }
-
-        // NEW: Function to decode Base64 strings safely
-        function base64Decode(input) {
-            try {
-                return atob(input);
-            } catch(e) {
-                console.error("Error decoding base64:", e);
-                return "";
-            }
-        }
-
-        // NEW: Function that performs the reference checks against token claims
-        function performReferenceChecks(claims, reference) {
-            const results = [];
-
-            // Check 1: reference.measurement + reference.host-data equals x-ms-sevsnpvm-launchmeasurement
-            const expectedLaunchMeasurement = ((reference.measurement || "") + (reference["host-data"] || "")).toLowerCase();
-            const actualLaunchMeasurement = (claims["x-ms-isolation-tee"]?.["x-ms-sevsnpvm-launchmeasurement"] || "").toLowerCase();
-            results.push({
-                description: "Launch Measurement Check (reference.measurement + reference.host-data vs. x-ms-sevsnpvm-launchmeasurement)",
-                expected: expectedLaunchMeasurement,
-                actual: actualLaunchMeasurement,
-                valid: expectedLaunchMeasurement === actualLaunchMeasurement
-            });
-
-            // Check 2: reference.vmid equals x-ms-azurevm-vmid
-            const expectedVmid = (reference.vmid || "").toLowerCase();
-            const actualVmid = (claims["x-ms-azurevm-vmid"] || "").toLowerCase();
-            results.push({
-                description: "VM ID Check (reference.vmid vs. x-ms-azurevm-vmid)",
-                expected: expectedVmid,
-                actual: actualVmid,
-                valid: expectedVmid === actualVmid
-            });
-
-            // Check 3: reference.manifest equals base64decoded x-ms-runtime.client-payload.manifest
-            const encodedManifest = claims["x-ms-runtime"] && claims["x-ms-runtime"]["client-payload"]
-                                    ? claims["x-ms-runtime"]["client-payload"].manifest
-                                    : "";
-            const decodedManifest = base64Decode(encodedManifest).toLowerCase();
-            const expectedManifest = (reference.manifest || "").toLowerCase();
-            results.push({
-                description: "Manifest Check (reference.manifest vs. decoded x-ms-runtime.client-payload.manifest)",
-                expected: expectedManifest,
-                actual: decodedManifest,
-                valid: expectedManifest === decodedManifest
-            });
-
-            // Check 4: reference.certificate equals base64decoded x-ms-runtime.client-payload.cert
-            const encodedCert = claims["x-ms-runtime"] && claims["x-ms-runtime"]["client-payload"]
-                                ? claims["x-ms-runtime"]["client-payload"].cert
-                                : "";
-            const decodedCert = base64Decode(encodedCert).toLowerCase();
-            const expectedCert = (reference.certificate || "").toLowerCase();
-            results.push({
-                description: "Certificate Check (reference.certificate vs. decoded x-ms-runtime.client-payload.cert)",
-                expected: expectedCert,
-                actual: decodedCert,
-                valid: expectedCert === decodedCert
-            });
-
-            return results;
-        }
-
-        // NEW: Function to display the reference checks in the UI
-        function displayReferenceChecks(checks) {
-            const outputDiv = document.getElementById('output');
             const section = document.createElement('div');
-            section.className = 'claim-section reference-checks';
-            section.innerHTML = `<h3>Reference Data Checks</h3>`;
+            section.className = 'claim-section';
+            section.innerHTML = `<h3>${sectionHeadings[sectionName]?.label || sectionName}</h3>
+            <p class="description">${sectionHeadings[sectionName]?.description || ''}</p>`;
             
-            checks.forEach(check => {
-                // Create a badge to indicate PASS or FAIL
-                const resultBadge = document.createElement('span');
-                resultBadge.className = `security-status ${check.valid ? 'valid' : 'invalid'}`;
-                resultBadge.innerText = check.valid ? 'PASS' : 'FAIL';
-                
-                const checkDiv = document.createElement('div');
-                checkDiv.className = 'check-item';
-                checkDiv.style.marginBottom = '10px';
-                // Format the check details
-                checkDiv.innerHTML = `
-                    <div>${resultBadge.outerHTML} <strong>${check.description}</strong></div>
-                    <div>Expected: ${check.expected}</div>
-                    <div>Actual: ${check.actual}</div>
+            const timelineDiv = document.createElement('div');
+            timelineDiv.className = 'timeline';
+            
+            // Find iat and nbf values
+            const iatClaim = sectionClaims.find(([key]) => key === 'iat');
+            const nbfClaim = sectionClaims.find(([key]) => key === 'nbf');
+            const expClaim = sectionClaims.find(([key]) => key === 'exp');
+            
+            // Add Issued At
+            if (iatClaim) {
+                const [key, value] = iatClaim;
+                const label = humanLabels[key]?.label || key;
+                timelineDiv.innerHTML += `
+                    <div class="timeline-item">
+                        <div class="timeline-label">${label}</div>
+                        <div class="timeline-value">${formatTimestamp(value, key)}</div>
+                    </div>
                 `;
-                section.appendChild(checkDiv);
-            });
-            outputDiv.appendChild(section);
+            }
+            
+            // Add Not Valid Before only if different from Issued At
+            if (nbfClaim && (!iatClaim || nbfClaim[1] !== iatClaim[1])) {
+                const [key, value] = nbfClaim;
+                const label = humanLabels[key]?.label || key;
+                timelineDiv.innerHTML += `
+                    <div class="timeline-item">
+                        <div class="timeline-label">${label}</div>
+                        <div class="timeline-value">${formatTimestamp(value, key)}</div>
+                    </div>
+                `;
+            }
+            
+            // Add Expiration
+            if (expClaim) {
+                const [key, value] = expClaim;
+                const label = humanLabels[key]?.label || key;
+                timelineDiv.innerHTML += `
+                    <div class="timeline-item">
+                        <div class="timeline-label">${label}</div>
+                        <div class="timeline-value">${formatTimestamp(value, key)}</div>
+                    </div>
+                `;
+            }
+            
+            section.appendChild(timelineDiv);
+            return section;
         }
 
-        window.onload = validateJWT;
+        // Helper function to create other sections
+        function createSection(claims, sectionName, matcher) {
+            const sectionClaims = Object.entries(claims).filter(([key]) =>
+                Array.isArray(matcher) ? matcher.includes(key) : matcher(key)
+            );
 
-        // Clean up interval when page is unloaded
-        window.addEventListener('unload', () => {
-            if (window.timeUpdateInterval) {
-                clearInterval(window.timeUpdateInterval);
+            if (sectionClaims.length === 0) return null;
+
+            const section = document.createElement('div');
+            section.className = 'claim-section';
+            section.innerHTML = `<h3>${sectionHeadings[sectionName]?.label || sectionName}</h3>
+            <p class="description">${sectionHeadings[sectionName]?.description || ''}</p>`;
+
+            // Sort claims for vmConfig section
+            if (sectionName === 'vmConfig') {
+                const sortedClaims = Object.keys(humanLabels)
+                    .filter(key => matcher(key) && sectionClaims.some(([k]) => k === key))
+                    .map(key => sectionClaims.find(([k]) => k === key));
+                sectionClaims.length = 0;
+                sectionClaims.push(...sortedClaims);
             }
-        });
+
+            sectionClaims.forEach(([key, value]) => {
+                const group = createClaimGroup(key, value, sectionName);
+                section.appendChild(group);
+            });
+
+            return section;
+        }
     </script>
     <style>
         body {
@@ -1027,6 +1156,110 @@
         .test-description a:hover {
             text-decoration: underline;
         }
+
+        /* New styles for Reference Data Checks */
+        .reference-checks {
+            background: #f8f9fa;
+            border: 1px solid #e1e4e8;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .check-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border: 1px solid #e1e4e8;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .check-item:hover {
+            background: #fafbfc;
+        }
+
+        .check-item > div {
+            margin: 5px 0;
+        }
+
+        .check-item .value-row {
+            display: grid;
+            grid-template-columns: 80px 1fr;
+            gap: 10px;
+            align-items: baseline;
+            padding: 5px 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .check-item .value-label {
+            color: #666;
+            font-weight: 500;
+            white-space: nowrap;
+            text-align: right;
+        }
+
+        .check-item .value-content {
+            word-break: break-all;
+            padding-left: 10px;
+            border-left: 2px solid #e1e4e8;
+        }
+
+        .check-item .values-container {
+            margin: 10px 0;
+            border: 1px solid #e1e4e8;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .check-item .values-container .value-row:first-child {
+            border-bottom: 1px solid #e1e4e8;
+        }
+
+        .check-item .values-container .value-row {
+            margin: 0;
+            border-radius: 0;
+        }
+
+        .timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e1e4e8;
+        }
+
+        .timeline-item {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            align-items: center;
+            gap: 15px;
+            padding: 5px 10px;
+        }
+
+        .timeline-item:not(:last-child) {
+            border-bottom: 1px solid #e1e4e8;
+            padding-bottom: 12px;
+        }
+
+        .timeline-label {
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .timeline-value {
+            color: #2c3e50;
+        }
+
+        .timeline-value .timestamp {
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -1034,12 +1267,11 @@
         <h1>Attestation Report</h1>
         <div class="claim-section">
             <p>
-                This page demonstrates client-side verification of an 
-                <a href="https://learn.microsoft.com/en-us/azure/attestation/overview">Azure Attestation</a> token
+                This page performs client-side verification of an attestation token
                 for a server running the <a href="https://github.com/comrade-coop/aapp-toolkit">aApp Toolkit</a>.
-                The token validates that the server is running in a Confidential VM and proves that the HTTPS certificate
-                for this domain was generated securely inside the Trusted Execution Environment (TEE). The page verifies
-                the JWT signature and displays the attestation claims in a human-readable format.
+                The token validates that the server is running in a Confidential VM and proves what software build 
+                it runs and that the HTTPS certificate it uses was generated securely inside a 
+                Trusted Execution Environment (TEE).
             </p>
         </div>
         <div id="output"></div>
