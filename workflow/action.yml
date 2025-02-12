@@ -120,16 +120,28 @@ runs:
     - shell: bash
       name: Send Base64 Encoded Cert via POST Request
       run: |
-        CERT_B64=$(base64 -w 0 0001_chain.pem)
+        AAPPMANIFESTSHA1=$(sha1sum ${{ inputs.aapp_manifest }} | awk '{print $1}')
+        AAPPCERTSHA1=$(awk '
+          /-----BEGIN CERTIFICATE-----/ {flag=1}
+          flag {print}
+          /-----END CERTIFICATE-----/ {flag=0; exit}
+        ' 0001_chain.pem | openssl x509 -noout -fingerprint -sha1)
 
         REFERENCE_JSON=$(sed \
             -e "s/__VMID__/${{ steps.create_vm.outputs.vmId }}/g" \
+            -e "s/__AAPPMANIFESTSHA1__/$AAPPMANIFESTSHA1/g" \
+            -e "s/__AAPPCERTSHA1__/$AAPPCERTSHA1/g" \
             -e "s/__AAPPRUNURL__/${{ inputs.current_job_url }}/g" \
             reference.json)
+        
         REFERENCE_B64=$(echo -n "$REFERENCE_JSON" | base64 -w 0)
+        CERT_B64=$(base64 -w 0 0001_chain.pem)
 
         # Create JSON payload with both cert and reference
         JSON_PAYLOAD=$(jq -n --arg cert "$CERT_B64" --arg reference "$REFERENCE_B64" '{cert: $cert, reference: $reference}')
+
+        echo Reference measurements generated during build
+        echo $JSON_PAYLOAD
 
         curl -X POST "http://${{ steps.create_vm.outputs.publicIp }}:12345" \
             -H "Content-Type: application/json" \
