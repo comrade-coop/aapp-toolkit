@@ -170,6 +170,11 @@
         "hardwareProfile": {
           "vmSize": "[variables('virtualMachineSize')]"
         },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": false
+          }
+        },
         "storageProfile": {
           "osDisk": {
             "createOption": "fromImage",
