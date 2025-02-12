@@ -24,6 +24,7 @@ SLEEP_TIME=10
 
 attempt=0
 while [ $attempt -lt $MAX_ATTEMPTS ]; do
+    sudo systemd-resolve --flush-caches
     txt_record=$(dig +short TXT "${DNS_RECORD}" | tr -d '"')
     echo "Attempt $((attempt + 1)): Found TXT record: ${txt_record}"
 
