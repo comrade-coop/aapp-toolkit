@@ -1,16 +1,23 @@
 #cloud-config
-package_update: true
-package_upgrade: true
-
-# Remove unwanted packages
-packages:
-  - git  # Ensure git is installed
-
-packages_remove:
-  - openssh-server
-
-# Create the startup script
 write_files:
+  - path: /root/remove-ssh.sh
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/bin/bash
+      set -e
+      apt-get purge -y openssh-server openssh-client openssh-sftp-server ssh-import-id
+      for svc in ssh sshd; do
+        if systemctl is-active --quiet $svc; then
+          systemctl stop $svc 2>/dev/null
+        fi
+        if systemctl list-unit-files | grep -q "^${svc}.service"; then
+          systemctl disable $svc 2>/dev/null
+        fi
+      done
+      rm -rf /etc/ssh /var/run/sshd
+      pkill -f sshd
+
   - path: /root/startup.sh
     permissions: '0755'
     owner: root:root
@@ -22,7 +29,8 @@ write_files:
       cd aapp-toolkit
       bash bootstrap/init.sh
 
-# Execute startup script after cloud-init completes
 runcmd:
+  - chmod +x /root/remove-ssh.sh
+  - /root/remove-ssh.sh
   - chmod +x /root/startup.sh
   - /root/startup.sh
