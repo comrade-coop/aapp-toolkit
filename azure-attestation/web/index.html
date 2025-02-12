@@ -202,19 +202,49 @@
                 
                 const checkDiv = document.createElement('div');
                 checkDiv.className = 'check-item';
-                checkDiv.innerHTML = `
-                    <div>${resultBadge.outerHTML} <strong>${check.description}</strong></div>
-                    <div class="values-container">
-                        <div class="value-row">
-                            <span class="value-label">Expected:</span>
-                            <span class="value-content">${check.expected || '(empty)'}</span>
+
+                // Add browser instructions specifically in the Certificate Check section
+                if (check.description === "Certificate Check") {
+                    const browser = detectBrowser();
+                    checkDiv.innerHTML = `
+                        <div>${resultBadge.outerHTML} <strong>${check.description}</strong></div>
+                        <div class="values-container">
+                            <div class="value-row">
+                                <span class="value-label">Expected:</span>
+                                <span class="value-content">${check.expected || '(empty)'}</span>
+                            </div>
+                            <div class="value-row">
+                                <span class="value-label">Actual:</span>
+                                <span class="value-content">${check.actual || '(empty)'}</span>
+                            </div>
                         </div>
-                        <div class="value-row">
-                            <span class="value-label">Actual:</span>
-                            <span class="value-content">${check.actual || '(empty)'}</span>
+                        <div class="certificate-verification-guide">
+                            <div class="guide-header">
+                                <svg class="verify-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                                </svg>
+                                <span>Verify in ${browser}</span>
+                            </div>
+                            <div class="guide-steps">
+                                ${getBrowserSpecificInstructions(browser)}
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else {
+                    checkDiv.innerHTML = `
+                        <div>${resultBadge.outerHTML} <strong>${check.description}</strong></div>
+                        <div class="values-container">
+                            <div class="value-row">
+                                <span class="value-label">Expected:</span>
+                                <span class="value-content">${check.expected || '(empty)'}</span>
+                            </div>
+                            <div class="value-row">
+                                <span class="value-label">Actual:</span>
+                                <span class="value-content">${check.actual || '(empty)'}</span>
+                            </div>
+                        </div>
+                    `;
+                }
                 section.appendChild(checkDiv);
             });
             outputDiv.appendChild(section);
@@ -728,6 +758,64 @@
             return group;
         }
 
+        function displayBrowserInstructions() {
+            const browser = detectBrowser();
+            const instructionsDiv = document.getElementById('browserInstructions');
+            
+            instructionsDiv.innerHTML = `
+                <div class="browser-instructions">
+                    <h4>How to Verify the Certificate</h4>
+                    <p>To manually verify that the certificate hash matches the one shown in the Reference Data Checks section, follow these steps for ${browser}:</p>
+                    
+                    <div class="browser-specific">
+                        ${getBrowserSpecificInstructions(browser)}
+                    </div>
+                    
+                    <p>Compare this certificate hash with the one shown in the "Certificate Check" section above. They should match exactly.</p>
+                </div>
+            `;
+        }
+
+        function getBrowserSpecificInstructions(browser) {
+            switch(browser) {
+                case "Chrome":
+                    return `
+                        <ol>
+                            <li>Click the padlock icon in the address bar</li>
+                            <li>Click "Connection is secure"</li>
+                            <li>Click "Certificate is valid"</li>
+                            <li>Go to the "Details" tab</li>
+                            <li>Scroll down to find "Thumbprint" (SHA-1)</li>
+                        </ol>`;
+                case "Firefox":
+                    return `
+                        <ol>
+                            <li>Click the padlock icon in the address bar</li>
+                            <li>Click the ">" arrow next to "Connection secure"</li>
+                            <li>Click "More Information"</li>
+                            <li>In the Security tab, click "View Certificate"</li>
+                            <li>Go to the "Details" tab</li>
+                            <li>Find "Fingerprint (SHA-1)"</li>
+                        </ol>`;
+                case "Safari":
+                    return `
+                        <ol>
+                            <li>Click the padlock icon in the address bar</li>
+                            <li>Click "Show Certificate"</li>
+                            <li>Click "Details"</li>
+                            <li>Find "SHA-1 Certificate Fingerprint"</li>
+                        </ol>`;
+                default:
+                    return `
+                        <ol>
+                            <li>Click the padlock icon in the address bar</li>
+                            <li>Look for certificate or security information</li>
+                            <li>Find the certificate details</li>
+                            <li>Look for SHA-1 fingerprint or thumbprint</li>
+                        </ol>`;
+            }
+        }
+
         function displayClaims(claims, validation, referenceState) {
             const outputDiv = document.getElementById('output');
             outputDiv.innerHTML = '';
@@ -769,7 +857,7 @@
                     }
                 }
             });
-
+            
             startTimerUpdates();
         }
 
@@ -1329,6 +1417,47 @@
         .reference-source-link:hover .external-link-icon {
             opacity: 1;
         }
+
+        /* New styles for Certificate Verification Guide */
+        .certificate-verification-guide {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+        }
+
+        .guide-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .verify-icon {
+            color: #3182ce;
+        }
+
+        .guide-steps {
+            margin-left: 10px;
+        }
+
+        .guide-steps ol {
+            margin: 0;
+            padding-left: 25px;
+        }
+
+        .guide-steps li {
+            margin: 8px 0;
+            color: #4a5568;
+            line-height: 1.4;
+        }
+
+        .guide-steps li:hover {
+            color: #2c3e50;
+        }
     </style>
 </head>
 <body>
@@ -1343,6 +1472,7 @@
                 Trusted Execution Environment (TEE).
             </p>
         </div>
+        <div id="browserInstructions"></div>
         <div id="output"></div>
     </div>
 </body>
