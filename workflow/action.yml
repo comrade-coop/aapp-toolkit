@@ -127,7 +127,7 @@ runs:
           /-----END CERTIFICATE-----/ {flag=0; exit}
         ' 0001_chain.pem | openssl x509 -noout -fingerprint -sha1 | sed 's/^.*=//; s/://g' | tr '[:upper:]' '[:lower:]')
 
-        AAPPRUNURL=$(echo "${{ inputs.current_job_ur }}" | jq -r .)
+        AAPPRUNURL=$(echo ${{ inputs.current_job_url }} | jq -r .)
 
         REFERENCE_JSON=$(sed \
             -e "s/__VMID__/${{ steps.create_vm.outputs.vmId }}/g" \
