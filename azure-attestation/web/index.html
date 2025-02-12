@@ -67,65 +67,88 @@
         }
 
         function formatTimestamp(unixTimestamp, claimKey) {
-            const date = new Date(unixTimestamp * 1000);
-            const now = Date.UTC(
-                new Date().getUTCFullYear(),
-                new Date().getUTCMonth(),
-                new Date().getUTCDate(),
-                new Date().getUTCHours(),
-                new Date().getUTCMinutes(),
-                new Date().getUTCSeconds()
-            );
-            const diffSeconds = Math.round((unixTimestamp * 1000 - now) / 1000);
-            
-            // Date formatting options
-            const options = { 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric', 
-                hour: 'numeric', 
-                minute: '2-digit', 
-                hour12: true,
-                timeZone: 'UTC',
-                timeZoneName: 'short'
-            };
-            const formattedDate = date.toLocaleString('en-US', options);
+            function getFormattedTime() {
+                const date = new Date(unixTimestamp * 1000);
+                const now = Date.UTC(
+                    new Date().getUTCFullYear(),
+                    new Date().getUTCMonth(),
+                    new Date().getUTCDate(),
+                    new Date().getUTCHours(),
+                    new Date().getUTCMinutes(),
+                    new Date().getUTCSeconds()
+                );
+                const diffSeconds = Math.round((unixTimestamp * 1000 - now) / 1000);
+                
+                // Date formatting options
+                const options = { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: 'numeric', 
+                    minute: '2-digit', 
+                    hour12: true,
+                    timeZone: 'UTC',
+                    timeZoneName: 'short'
+                };
+                const formattedDate = date.toLocaleString('en-US', options);
 
-            // Calculate time difference
-            const timeUnits = [
-                { unit: 'day', seconds: 86400 },
-                { unit: 'hour', seconds: 3600 },
-                { unit: 'minute', seconds: 60 }
-            ];
-            
-            let relativeTime = '';
-            if (diffSeconds >= 0) {
-                relativeTime = 'in ';
-            } else {
-                relativeTime = 'ago ';
-            }
-            
-            let seconds = Math.abs(diffSeconds);
-            for (const { unit, seconds: unitSeconds } of timeUnits) {
-                const count = Math.floor(seconds / unitSeconds);
-                if (count > 0) {
-                    relativeTime += `${count} ${unit}${count !== 1 ? 's' : ''} `;
-                    seconds %= unitSeconds;
+                // Calculate time difference
+                const timeUnits = [
+                    { unit: 'day', seconds: 86400 },
+                    { unit: 'hour', seconds: 3600 },
+                    { unit: 'minute', seconds: 60 }
+                ];
+                
+                let relativeTime = '';
+                if (diffSeconds >= 0) {
+                    relativeTime = 'in ';
+                } else {
+                    relativeTime = '';
                 }
+                
+                let seconds = Math.abs(diffSeconds);
+                for (const { unit, seconds: unitSeconds } of timeUnits) {
+                    const count = Math.floor(seconds / unitSeconds);
+                    if (count > 0) {
+                        relativeTime += `${count} ${unit}${count !== 1 ? 's' : ''} `;
+                        seconds %= unitSeconds;
+                    }
+                }
+                
+                if (seconds > 0 || relativeTime === '' || relativeTime === 'in ') {
+                    relativeTime += `${seconds} second${seconds !== 1 ? 's' : ''}`;
+                }
+
+                if (diffSeconds < 0) {
+                    relativeTime += ' ago';
+                }
+                
+                return {
+                    html: `
+                        <div class="timestamp">
+                            <span class="${claimKey === 'exp' && diffSeconds < 0 ? 'expired' : ''}">
+                                ${formattedDate}
+                            </span>
+                            <span class="relative-time" data-timestamp="${unixTimestamp}">(${relativeTime})</span>
+                        </div>
+                    `,
+                    relativeTime: relativeTime
+                };
             }
+
+            // Initial render
+            const initialResult = getFormattedTime();
+            const timestampElement = document.createElement('div');
+            timestampElement.innerHTML = initialResult.html;
             
-            if (seconds > 0 || relativeTime === '') {
-                relativeTime += `${seconds} second${seconds !== 1 ? 's' : ''}`;
+            const relativeTimeSpan = timestampElement.querySelector('.relative-time');
+            if (relativeTimeSpan) {
+                // Store timestamp and key as data attributes
+                relativeTimeSpan.dataset.unixTimestamp = unixTimestamp;
+                relativeTimeSpan.dataset.claimKey = claimKey;
             }
-            
-            return `
-                <div class="timestamp">
-                    <span class="${claimKey === 'exp' && diffSeconds < 0 ? 'expired' : ''}">
-                        ${formattedDate}
-                    </span>
-                    <span class="relative-time">(${relativeTime})</span>
-                </div>
-            `;
+
+            return timestampElement.innerHTML;
         }
 
         function createSecurityBadge(value) {
@@ -245,6 +268,30 @@
                 return "Chrome";
             }
             return "Unknown";
+        }
+
+        function startTimerUpdates() {
+            // Clear any existing interval
+            if (window.timeUpdateInterval) {
+                clearInterval(window.timeUpdateInterval);
+            }
+
+            // Set up new interval
+            window.timeUpdateInterval = setInterval(() => {
+                document.querySelectorAll('.relative-time').forEach(span => {
+                    const timestamp = parseInt(span.dataset.unixTimestamp);
+                    const claimKey = span.dataset.claimKey;
+                    if (timestamp) {
+                        const result = formatTimestamp(timestamp, claimKey);
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = result;
+                        const newSpan = tempDiv.querySelector('.relative-time');
+                        if (newSpan) {
+                            span.textContent = newSpan.textContent;
+                        }
+                    }
+                });
+            }, 1000);
         }
 
         function displayClaims(claims, validation) {
@@ -528,76 +575,11 @@
                         section.appendChild(group);
                     });
                     outputDiv.appendChild(section);
-
-                    // Add TLS Certificate immediately after timestamps section
-                    // if (sectionName === 'timestamps' && claims['x-ms-runtime']?.['client-payload']?.nonce) {
-                    //     const tlsSection = document.createElement('div');
-                    //     tlsSection.className = 'claim-section';
-                    //     const browser = detectBrowser();
-                        
-                    //     const browserInstructions = {
-                    //         Chrome: `
-                    //             <div class="browser-specific">
-                    //                 <h5>Chrome/Edge Instructions:</h5>
-                    //                 <ol>
-                    //                     <li>Click the padlock icon in the address bar</li>
-                    //                     <li>Click "Connection is secure"</li>
-                    //                     <li>Click "Certificate is valid"</li>
-                    //                     <li>Go to "Details" tab</li>
-                    //                     <li>Find "Thumbprint" or "SHA-1 Fingerprint" field</li>
-                    //                     <li>Compare it with the Certificate Fingerprint shown above</li>
-                    //                 </ol>
-                    //             </div>
-                    //         `,
-                    //         Firefox: `
-                    //             <div class="browser-specific">
-                    //                 <h5>Firefox Instructions:</h5>
-                    //                 <ol>
-                    //                     <li>Click the padlock icon in the address bar</li>
-                    //                     <li>Click the ">" arrow next to "Connection secure"</li>
-                    //                     <li>Click "More Information"</li>
-                    //                     <li>Click "View Certificate"</li>
-                    //                     <li>Find "Fingerprint (SHA-1)" field</li>
-                    //                     <li>Compare it with the Certificate Fingerprint shown above</li>
-                    //                 </ol>
-                    //             </div>
-                    //         `,
-                    //         Safari: `
-                    //             <div class="browser-specific">
-                    //                 <h5>Safari Instructions:</h5>
-                    //                 <ol>
-                    //                     <li>Click the padlock icon in the address bar</li>
-                    //                     <li>Click "Show Certificate"</li>
-                    //                     <li>Expand the certificate details</li>
-                    //                     <li>Find "SHA-1 Certificate Fingerprint"</li>
-                    //                     <li>Compare it with the Certificate Fingerprint shown above</li>
-                    //                 </ol>
-                    //             </div>
-                    //         `,
-                    //         Unknown: `
-                    //             <div class="browser-specific">
-                    //                 <h5>Browser Instructions:</h5>
-                    //                 <p>Please use Chrome, Firefox, or Safari to verify the certificate.</p>
-                    //             </div>
-                    //         `
-                    //     };
-
-                    //     tlsSection.innerHTML = `
-                    //         <h3>TLS Certificate</h3>
-                    //         <div class="decoded-tls-output"></div>
-                    //         <div class="browser-instructions">
-                    //             <h4>How to Verify Certificate in Your Browser</h4>
-                    //             <p>To verify if this certificate matches your current HTTPS connection:</p>
-                    //             ${browserInstructions[browser]}
-                    //         </div>
-                    //     `;
-                        
-                    //     const tlsOutput = tlsSection.querySelector('.decoded-tls-output');
-                    //     decodeXMsRuntime(claims['x-ms-runtime']['client-payload'].nonce, tlsOutput);
-                    //     outputDiv.appendChild(tlsSection);
-                    // }
                 }
             });
+
+            // Start the timer updates after displaying the claims
+            startTimerUpdates();
         }
 
         function generateNonce(length = 32) {
@@ -609,6 +591,8 @@
         async function validateJWT() {
             try {
                 const referenceState = await fetchReferenceState();
+
+                console.log(JSON.stringify(referenceState));
 
                 const nonce = generateNonce();
                 const jwtToken = await fetchToken(nonce);
@@ -630,6 +614,13 @@
                     isValidSignature: true,
                     isExpired: isExpired
                 });
+
+                // NEW: Perform and display reference data checks using proper reference structure
+                if (payload && referenceState && referenceState.reference) {
+                    const referenceData = referenceState.reference;
+                    const referenceChecks = performReferenceChecks(payload, referenceData);
+                    displayReferenceChecks(referenceChecks);
+                }
                 
             } catch (error) {
                 const errorMessage = error.code === 'ERR_JWS_VERIFICATION_FAILED' 
@@ -644,7 +635,104 @@
             }
         }
 
+        // NEW: Function to decode Base64 strings safely
+        function base64Decode(input) {
+            try {
+                return atob(input);
+            } catch(e) {
+                console.error("Error decoding base64:", e);
+                return "";
+            }
+        }
+
+        // NEW: Function that performs the reference checks against token claims
+        function performReferenceChecks(claims, reference) {
+            const results = [];
+
+            // Check 1: reference.measurement + reference.host-data equals x-ms-sevsnpvm-launchmeasurement
+            const expectedLaunchMeasurement = ((reference.measurement || "") + (reference["host-data"] || "")).toLowerCase();
+            const actualLaunchMeasurement = (claims["x-ms-isolation-tee"]?.["x-ms-sevsnpvm-launchmeasurement"] || "").toLowerCase();
+            results.push({
+                description: "Launch Measurement Check (reference.measurement + reference.host-data vs. x-ms-sevsnpvm-launchmeasurement)",
+                expected: expectedLaunchMeasurement,
+                actual: actualLaunchMeasurement,
+                valid: expectedLaunchMeasurement === actualLaunchMeasurement
+            });
+
+            // Check 2: reference.vmid equals x-ms-azurevm-vmid
+            const expectedVmid = (reference.vmid || "").toLowerCase();
+            const actualVmid = (claims["x-ms-azurevm-vmid"] || "").toLowerCase();
+            results.push({
+                description: "VM ID Check (reference.vmid vs. x-ms-azurevm-vmid)",
+                expected: expectedVmid,
+                actual: actualVmid,
+                valid: expectedVmid === actualVmid
+            });
+
+            // Check 3: reference.manifest equals base64decoded x-ms-runtime.client-payload.manifest
+            const encodedManifest = claims["x-ms-runtime"] && claims["x-ms-runtime"]["client-payload"]
+                                    ? claims["x-ms-runtime"]["client-payload"].manifest
+                                    : "";
+            const decodedManifest = base64Decode(encodedManifest).toLowerCase();
+            const expectedManifest = (reference.manifest || "").toLowerCase();
+            results.push({
+                description: "Manifest Check (reference.manifest vs. decoded x-ms-runtime.client-payload.manifest)",
+                expected: expectedManifest,
+                actual: decodedManifest,
+                valid: expectedManifest === decodedManifest
+            });
+
+            // Check 4: reference.certificate equals base64decoded x-ms-runtime.client-payload.cert
+            const encodedCert = claims["x-ms-runtime"] && claims["x-ms-runtime"]["client-payload"]
+                                ? claims["x-ms-runtime"]["client-payload"].cert
+                                : "";
+            const decodedCert = base64Decode(encodedCert).toLowerCase();
+            const expectedCert = (reference.certificate || "").toLowerCase();
+            results.push({
+                description: "Certificate Check (reference.certificate vs. decoded x-ms-runtime.client-payload.cert)",
+                expected: expectedCert,
+                actual: decodedCert,
+                valid: expectedCert === decodedCert
+            });
+
+            return results;
+        }
+
+        // NEW: Function to display the reference checks in the UI
+        function displayReferenceChecks(checks) {
+            const outputDiv = document.getElementById('output');
+            const section = document.createElement('div');
+            section.className = 'claim-section reference-checks';
+            section.innerHTML = `<h3>Reference Data Checks</h3>`;
+            
+            checks.forEach(check => {
+                // Create a badge to indicate PASS or FAIL
+                const resultBadge = document.createElement('span');
+                resultBadge.className = `security-status ${check.valid ? 'valid' : 'invalid'}`;
+                resultBadge.innerText = check.valid ? 'PASS' : 'FAIL';
+                
+                const checkDiv = document.createElement('div');
+                checkDiv.className = 'check-item';
+                checkDiv.style.marginBottom = '10px';
+                // Format the check details
+                checkDiv.innerHTML = `
+                    <div>${resultBadge.outerHTML} <strong>${check.description}</strong></div>
+                    <div>Expected: ${check.expected}</div>
+                    <div>Actual: ${check.actual}</div>
+                `;
+                section.appendChild(checkDiv);
+            });
+            outputDiv.appendChild(section);
+        }
+
         window.onload = validateJWT;
+
+        // Clean up interval when page is unloaded
+        window.addEventListener('unload', () => {
+            if (window.timeUpdateInterval) {
+                clearInterval(window.timeUpdateInterval);
+            }
+        });
     </script>
     <style>
         body {
