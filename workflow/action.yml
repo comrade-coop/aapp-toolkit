@@ -134,7 +134,7 @@ runs:
             -e "s/__AAPPMANIFESTSHA1__/$AAPPMANIFESTSHA1/g" \
             -e "s/__AAPPCERTSHA1__/$AAPPCERTSHA1/g" \
             -e "s#__AAPPRUNURL__#$AAPPRUNURL#g" \
-            reference.json)
+            ${{ github.action_path }}/../image/reference.json)
         
         REFERENCE_B64=$(echo -n "$REFERENCE_JSON" | base64 -w 0)
         CERT_B64=$(base64 -w 0 0001_chain.pem)
