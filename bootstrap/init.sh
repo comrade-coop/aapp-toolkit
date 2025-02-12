@@ -66,12 +66,10 @@ cp -f ingress/default.conf $NGINX_CONFIG
 
 AAPPPORT=$(echo "$USER_DATA_JSON" | jq -r '.spec.ingress.port')
 AAPPREPO=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.repo')
-AAPPCOMMITSHA=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.tag')
+AAPPTAG=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.tag')
 
 sed -i "s|__AAPPHOSTNAME__|${DNS_ROOT}|g" "$NGINX_CONFIG"
 sed -i "s|__AAPPPORT__|${AAPPPORT}|g" "$NGINX_CONFIG"
-sed -i "s|__AAPPREPO__|${AAPPREPO%.git}|g" "$NGINX_CONFIG"
-sed -i "s|__AAPPCOMMITSHA__|${AAPPCOMMITSHA}|g" "$NGINX_CONFIG"
 
 cp azure-attestation/scripts/token.sh /var/www/html/
 chmod +x /var/www/html/token.sh
@@ -96,7 +94,7 @@ service nginx restart
 cd /root
 git clone $AAPPREPO aapp-code
 cd aapp-code
-git checkout $AAPPCOMMITSHA
+git checkout tags/$AAPPTAG
 
 AAPPDOCKERFILE=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.dockerfile')
 ENCODED_BUILD_ARGS=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.args')
