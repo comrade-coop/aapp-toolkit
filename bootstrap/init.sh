@@ -110,9 +110,11 @@ BUILD_ARGS=""
 
 # Read and process the aapp.args file and ensure proper line endings
 sed -i 's/\r$//' aapp.args
-while IFS='=' read -r key value; do
+while IFS='=' read -r key value || [ -n "$key" ]; do
+    key=$(echo "$key" | xargs)
+    value=$(echo "$value" | xargs)
     BUILD_ARGS+=" --build-arg $key=$value"
-done < "aapp.args"
+done < <(cat "aapp.args"; echo)
 
 # Install docker
 apt-get update -yq
