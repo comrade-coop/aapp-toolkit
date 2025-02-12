@@ -125,13 +125,15 @@ runs:
           /-----BEGIN CERTIFICATE-----/ {flag=1}
           flag {print}
           /-----END CERTIFICATE-----/ {flag=0; exit}
-        ' 0001_chain.pem | openssl x509 -noout -fingerprint -sha1)
+        ' 0001_chain.pem | openssl x509 -noout -fingerprint -sha1 | sed 's/^.*=//; s/://g' | tr '[:upper:]' '[:lower:]')
+
+        AAPPRUNURL=$(echo "${{ inputs.current_job_ur }}" | jq -r .)
 
         REFERENCE_JSON=$(sed \
             -e "s/__VMID__/${{ steps.create_vm.outputs.vmId }}/g" \
             -e "s/__AAPPMANIFESTSHA1__/$AAPPMANIFESTSHA1/g" \
             -e "s/__AAPPCERTSHA1__/$AAPPCERTSHA1/g" \
-            -e "s/__AAPPRUNURL__/${{ inputs.current_job_url }}/g" \
+            -e "s#__AAPPRUNURL__#$AAPPRUNURL#g" \
             reference.json)
         
         REFERENCE_B64=$(echo -n "$REFERENCE_JSON" | base64 -w 0)
