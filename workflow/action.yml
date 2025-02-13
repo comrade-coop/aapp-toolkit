@@ -69,7 +69,7 @@ runs:
         az account set --subscription "${{ inputs.subscription_id }}"
 
         az deployment group create \
-            --resource-group $RESOURCE_GROUP \
+            --resource-group ${{ inputs.resource_group }} \
             --template-file $arm_template \
             --parameters \
                         virtualMachineName="${{ inputs.vm_name }}" \
