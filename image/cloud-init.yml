@@ -6,7 +6,7 @@ write_files:
     content: |
       #!/bin/bash
       set -e
-      apt-get purge -y openssh-server openssh-client openssh-sftp-server ssh-import-id
+      apt-get purge -y openssh-server
       for svc in ssh sshd; do
         if systemctl is-active --quiet $svc; then
           systemctl stop $svc 2>/dev/null
@@ -15,7 +15,7 @@ write_files:
           systemctl disable $svc 2>/dev/null
         fi
       done
-      rm -rf /etc/ssh /var/run/sshd
+      rm -rf /etc/ssh /var/run/sshd /root/.ssh /home/azureuser/.ssh
       pkill -f sshd
 
   - path: /root/startup.sh

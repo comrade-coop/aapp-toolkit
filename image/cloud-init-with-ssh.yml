@@ -1,0 +1,16 @@
+#cloud-config
+write_files:
+  - path: /root/startup.sh
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/bin/bash
+      set -e  
+      cd /root
+      git clone https://github.com/comrade-coop/aapp-toolkit.git
+      cd aapp-toolkit
+      bash bootstrap/init.sh
+
+runcmd:
+  - chmod +x /root/startup.sh
+  - /root/startup.sh

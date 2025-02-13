@@ -1,5 +1,4 @@
 #!/bin/bash
-# dns-challenge-webhook.sh
 
 # Duplicate stdout and stderr to HOOK_LOG.
 exec > >(tee -a "$HOOK_LOG") 2> >(tee -a "$HOOK_LOG" >&2)

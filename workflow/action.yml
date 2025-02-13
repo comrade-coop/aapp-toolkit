@@ -26,6 +26,9 @@ inputs:
   vm_network_id:
     description: 'Azure VM Network ID'
     required: true
+  vm_ssh_enabled:
+    description: 'Enable SSH access to VM (dev environment only)'
+    required: true
   vm_dev_key:
     description: 'Azure VM Development Key'
     required: true
@@ -50,18 +53,32 @@ runs:
       id: create_vm
       run: |
         output_file="${RUNNER_TEMP}/vm_output.json"
+        if [ "${{ inputs.vm_ssh_enabled }}" = "true" ]; then
+          cloud_init="${{ github.action_path }}/../image/cloud-init-ssh.yml"
+        else
+          cloud_init="${{ github.action_path }}/../image/cloud-init.yml"
+        fi
+        arm_template="${{ github.action_path }}/template.json"
         
-        ${{ github.action_path }}/entrypoint.sh "${{ inputs.client_id }}" \
-                                                "${{ inputs.client_secret }}" \
-                                                "${{ inputs.subscription_id }}" \
-                                                "${{ inputs.tenant_id }}" \
-                                                "${{ inputs.resource_group }}" \
-                                                "${{ inputs.vm_name }}" \
-                                                "${{ inputs.vm_network_id }}" \
-                                                "${{ inputs.vm_dev_key }}" \
-                                                "${{ inputs.aapp_manifest }}" \
-                                                "${{ github.action_path }}" \
-                                                $output_file
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+        az login --service-principal \
+            --username "${{ inputs.client_id }}" \
+            --password "${{ inputs.client_secret }}" \
+            --tenant "${{ inputs.tenant_id }}"
+        az account set --subscription "${{ inputs.subscription_id }}"
+
+        az deployment group create \
+            --resource-group $RESOURCE_GROUP \
+            --template-file $arm_template \
+            --parameters \
+                        virtualMachineName="${{ inputs.vm_name }}" \
+                        virtualNetworkId="${{ inputs.vm_network_id }}" \
+                        subnetName="default" \
+                        sshKeyName="${{ inputs.vm_dev_key }}" \
+                        userData=@${{ inputs.aapp_manifest }} \
+                        customData=@$cloud_init > $output_file
+        echo "VM creation completed successfully: $output_file"
         
         public_ip=$(jq -r '.properties.outputs.publicIpAddress.value' $output_file)
         vm_id=$(jq -r '.properties.outputs.virtualMachineId.value' $output_file)
@@ -96,7 +113,7 @@ runs:
 
     - shell: bash 
       name: Ensure hook script is executable
-      run: chmod +x ${{ github.action_path }}/dns-challenge-webhook.sh
+      run: chmod +x ${{ github.action_path }}/dns-hook.sh
 
     - shell: bash
       name: Run Certbot in manual mode with DNS challenge
@@ -110,7 +127,7 @@ runs:
                   --non-interactive \
                   --agree-tos \
                   --email "${{ inputs.certbot_email }}" \
-                  --manual-auth-hook "${{ github.action_path }}/dns-challenge-webhook.sh" \
+                  --manual-auth-hook "${{ github.action_path }}/dns-hook.sh" \
                   --csr "${RUNNER_TEMP}/cert.csr" &
         CERTBOT_PID=$!
 
