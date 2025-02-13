@@ -54,7 +54,7 @@ runs:
       run: |
         output_file="${RUNNER_TEMP}/vm_output.json"
         if [ "${{ inputs.vm_ssh_enabled }}" = "true" ]; then
-          cloud_init="${{ github.action_path }}/../image/cloud-init-ssh.yml"
+          cloud_init="${{ github.action_path }}/../image/cloud-init-with-ssh.yml"
         else
           cloud_init="${{ github.action_path }}/../image/cloud-init.yml"
         fi
