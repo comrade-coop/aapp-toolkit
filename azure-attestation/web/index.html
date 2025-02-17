@@ -10,6 +10,10 @@
         // Initialize time state and start validation when ready
         async function init() {
             try {
+                // Show loading state
+                document.getElementById('loading').style.display = 'flex';
+                document.getElementById('output').innerHTML = '';
+
                 // Global state for time tracking with initialization
                 const initialReliableTime = await getReliableTime();
                 const globalTimeState = {
@@ -25,6 +29,9 @@
                     isValidSignature: false,
                     errorMessage: `Initialization Error: ${error.message}`
                 }, null);
+            } finally {
+                // Hide loading state
+                document.getElementById('loading').style.display = 'none';
             }
         }
 
@@ -438,6 +445,21 @@
             container.className = 'nested-object';
             
             for (const [key, value] of Object.entries(data)) {
+                /*
+                The "console-enabled" property is intentionally excluded from display.
+                It is not documented anywhere nighter in the 
+                AMD nor the Microsoft documentation but is somehow present in the 
+                JWT Token returned by the Azure Attestation Service.
+
+                While Azure VMs typically have SSH access enabled, this autonomous instance
+                has SSH disabled by a [cloud-init](./image/cloud-init.yml) script during initial boot.
+                You can verify this configuration for this specific VM by checking the build logs
+                (Data.source) and the VM's Unique ID.          
+                */
+                if (key === 'console-enabled') {
+                    continue;
+                }
+
                 const row = document.createElement('div');
                 row.className = 'claim-group';
                 row.style.marginLeft = `${level * 20}px`;
@@ -1544,6 +1566,39 @@
         .guide-steps li:hover {
             color: #2c3e50;
         }
+
+        /* Loading animation styles */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin: 20px 0;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        .loading-text {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -1557,6 +1612,11 @@
                 it runs and that the HTTPS certificate it uses was generated securely inside a 
                 Trusted Execution Environment (TEE).
             </p>
+        </div>
+        <!-- Add loading container -->
+        <div id="loading" class="loading-container" style="display: none;">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Verifying attestation token...</div>
         </div>
         <div id="browserInstructions"></div>
         <div id="output"></div>
