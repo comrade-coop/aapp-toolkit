@@ -1332,7 +1332,7 @@
         .timeline {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 15px;
             background: #f8f9fa;
             padding: 15px;
             border-radius: 6px;
@@ -1340,21 +1340,23 @@
         }
 
         .timeline-item {
-            display: grid;
-            grid-template-columns: 140px 1fr;
-            align-items: center;
-            gap: 15px;
-            padding: 5px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #e1e4e8;
         }
 
         .timeline-item:not(:last-child) {
             border-bottom: 1px solid #e1e4e8;
-            padding-bottom: 12px;
         }
 
         .timeline-label {
             font-weight: 500;
             color: #495057;
+            font-size: 0.9em;
         }
 
         .timeline-value {
@@ -1362,7 +1364,38 @@
         }
 
         .timeline-value .timestamp {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: baseline;
             margin: 0;
+        }
+
+        .timeline-value .timestamp > span:first-child {
+            font-weight: 500;
+        }
+
+        .timeline-value .relative-time {
+            color: #666;
+            font-size: 0.9em;
+            margin: 0;
+        }
+
+        /* Add media query for larger screens */
+        @media (min-width: 640px) {
+            .timeline-item {
+                flex-direction: row;
+                align-items: center;
+                gap: 15px;
+            }
+
+            .timeline-label {
+                flex: 0 0 140px;
+            }
+
+            .timeline-value {
+                flex: 1;
+            }
         }
 
         .reference-source {
