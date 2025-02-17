@@ -121,7 +121,7 @@ runs:
         LOG_FILE="${RUNNER_TEMP}/dns-hook.log"
         touch "$LOG_FILE"
 
-        sudo -E HOOK_LOG="$LOG_FILE" certbot certonly \
+        sudo -E HOOK_LOG="$LOG_FILE" HOOK_IP="$publicIp" certbot certonly \
                   --manual \
                   --preferred-challenges dns \
                   --non-interactive \
