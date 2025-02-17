@@ -111,7 +111,7 @@
         });
 
         //===============================================
-        // Implimentation functions
+        // Implimentation
         //===============================================
 
         async function getReliableTime() {
@@ -279,15 +279,18 @@
                             </div>
                         </div>
                         <div class="certificate-verification-guide">
-                            <div class="guide-header">
-                                <svg class="verify-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
-                                </svg>
-                                <span>Verify in ${browser}</span>
-                            </div>
-                            <div class="guide-steps">
-                                ${getBrowserSpecificInstructions(browser)}
-                            </div>
+                            <details class="verification-details">
+                                <summary class="verification-summary">
+                                    <svg class="verify-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                                    </svg>
+                                    Manual Certificate Verification
+                                </summary>
+                                <div class="verification-content">
+                                    ${getBrowserSpecificInstructions(browser)}
+                                    <p class="verification-note">Compare the certificate hash in your browser with the value shown above. Your browser may display the hash with colons or dashes between character pairs.</p>
+                                </div>
+                            </details>
                         </div>
                     `;
                 } else {
@@ -544,11 +547,26 @@
         function detectBrowser() {
             const userAgent = navigator.userAgent;
             
+            // Check if mobile
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+            
+            if (isMobile) {
+                if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) {
+                    return "MobileSafari";
+                } else if (userAgent.includes("Firefox")) {
+                    return "MobileFirefox";
+                } else if (userAgent.includes("Chrome") || userAgent.includes("Edg")) {
+                    return "MobileChrome";
+                }
+                return "MobileOther";
+            }
+            
+            // Desktop browsers
             if (userAgent.includes("Firefox")) {
                 return "Firefox";
             } else if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) {
                 return "Safari";
-            } else if (userAgent.includes("Chrome") || userAgent.includes("Edg")) {
+            } else if (userAgent.includes("Chrom") || userAgent.includes("Edg")) {
                 return "Chrome";
             }
             return "Unknown";
@@ -833,24 +851,6 @@
             return group;
         }
 
-        function displayBrowserInstructions() {
-            const browser = detectBrowser();
-            const instructionsDiv = document.getElementById('browserInstructions');
-            
-            instructionsDiv.innerHTML = `
-                <div class="browser-instructions">
-                    <h4>How to Verify the Certificate</h4>
-                    <p>To manually verify that the certificate hash matches the one shown in the Reference Data Checks section, follow these steps for ${browser}:</p>
-                    
-                    <div class="browser-specific">
-                        ${getBrowserSpecificInstructions(browser)}
-                    </div>
-                    
-                    <p>Compare this certificate hash with the one shown in the "Certificate Check" section above. They should match exactly.</p>
-                </div>
-            `;
-        }
-
         function getBrowserSpecificInstructions(browser) {
             switch(browser) {
                 case "Chrome":
@@ -862,6 +862,13 @@
                             <li>Go to the "Details" tab</li>
                             <li>Scroll down to find "Thumbprint" (SHA-1)</li>
                         </ol>`;
+                case "MobileChrome":
+                    return `
+                        <ol>
+                            <li>Tap the padlock icon in the address bar</li>
+                            <li>Tap "Certificate"</li>
+                            <li>Scroll down to find "SHA-1 fingerprint"</li>
+                        </ol>`;
                 case "Firefox":
                     return `
                         <ol>
@@ -872,6 +879,13 @@
                             <li>Go to the "Details" tab</li>
                             <li>Find "Fingerprint (SHA-1)"</li>
                         </ol>`;
+                case "MobileFirefox":
+                    return `
+                        <ol>
+                            <li>Tap the padlock icon in the address bar</li>
+                            <li>Tap "Show certificate"</li>
+                            <li>Scroll down to find "SHA-1 Fingerprint"</li>
+                        </ol>`;
                 case "Safari":
                     return `
                         <ol>
@@ -880,10 +894,26 @@
                             <li>Click "Details"</li>
                             <li>Find "SHA-1 Certificate Fingerprint"</li>
                         </ol>`;
+                case "MobileSafari":
+                    return `
+                        <ol>
+                            <li>Tap the "aA" or padlock icon in the address bar</li>
+                            <li>Tap "Website Security"</li>
+                            <li>Tap "Certificate"</li>
+                            <li>Scroll down to find "SHA-1 Fingerprint"</li>
+                        </ol>`;
+                case "MobileOther":
+                    return `
+                        <ol>
+                            <li>Tap the padlock or security icon in the address bar</li>
+                            <li>Look for certificate or security information</li>
+                            <li>Find the certificate details</li>
+                            <li>Look for SHA-1 fingerprint or thumbprint</li>
+                        </ol>`;
                 default:
                     return `
                         <ol>
-                            <li>Click the padlock icon in the address bar</li>
+                            <li>Click/tap the padlock icon in the address bar</li>
                             <li>Look for certificate or security information</li>
                             <li>Find the certificate details</li>
                             <li>Look for SHA-1 fingerprint or thumbprint</li>
@@ -1526,45 +1556,67 @@
             opacity: 1;
         }
 
-        /* New styles for Certificate Verification Guide */
+        /* Refined Certificate Verification Guide styles */
         .certificate-verification-guide {
-            margin-top: 15px;
-            padding: 15px;
-            background: #f8f9fa;
-            border: 1px solid #e1e4e8;
-            border-radius: 6px;
+            margin-top: 12px;
+            border-top: 1px solid #e1e4e8;
+            padding-top: 12px;
         }
 
-        .guide-header {
+        .verification-details {
+            cursor: pointer;
+        }
+
+        .verification-summary {
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 12px;
-            color: #2c3e50;
-            font-weight: 500;
+            color: #586069;
+            font-size: 0.9em;
+            padding: 6px 0;
+            list-style: none;
         }
 
-        .verify-icon {
-            color: #3182ce;
+        .verification-summary::-webkit-details-marker {
+            display: none;
         }
 
-        .guide-steps {
-            margin-left: 10px;
+        .verification-summary:hover {
+            color: #0366d6;
         }
 
-        .guide-steps ol {
+        .verification-summary .verify-icon {
+            color: #6a737d;
+        }
+
+        .verification-summary:hover .verify-icon {
+            color: #0366d6;
+        }
+
+        .verification-content {
+            margin-top: 10px;
+            padding: 12px 15px;
+            background: #f6f8fa;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .verification-content ol {
             margin: 0;
             padding-left: 25px;
+            color: #444d56;
         }
 
-        .guide-steps li {
-            margin: 8px 0;
-            color: #4a5568;
+        .verification-content li {
+            margin: 6px 0;
             line-height: 1.4;
         }
 
-        .guide-steps li:hover {
-            color: #2c3e50;
+        .verification-note {
+            margin: 10px 0 0;
+            color: #666;
+            font-size: 0.9em;
+            font-style: italic;
         }
 
         /* Loading animation styles */
