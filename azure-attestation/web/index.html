@@ -7,6 +7,8 @@
     <script type="module">
         import { jwtVerify } from 'https://cdn.skypack.dev/jose';
 
+        
+
         // Initialize time state and start validation when ready
         async function init() {
             try {
@@ -64,16 +66,6 @@
                 const elapsedSeconds = (performance.now() / 1000) - globalTimeState.initialPerformanceTime;
                 const currentTime = globalTimeState.initialReliableTime + Math.floor(elapsedSeconds);
                 
-                // Decode token to check timestamps before verification
-                const [, payloadB64] = jwtToken.split('.');
-                const decodedPayload = JSON.parse(atob(payloadB64));
-                console.log('Token timestamps:', {
-                    nbf: new Date(decodedPayload.nbf * 1000).toISOString(),
-                    iat: new Date(decodedPayload.iat * 1000).toISOString(),
-                    exp: new Date(decodedPayload.exp * 1000).toISOString()
-                });
-                console.log('Current time:', new Date(currentTime * 1000).toISOString());
-
                 const { payload, protectedHeader } = await jwtVerify(jwtToken, key, {
                     algorithms: ['RS256'],
                     currentDate: new Date(currentTime * 1000),
@@ -103,7 +95,7 @@
 
         window.onload = init;
 
-        // Clean up interval when page is unloaded
+        // Clean up time update when page is unloaded
         window.addEventListener('unload', () => {
             if (window.timeUpdateInterval) {
                 clearInterval(window.timeUpdateInterval);
@@ -111,7 +103,7 @@
         });
 
         //===============================================
-        // Implimentation
+        // Fetching
         //===============================================
 
         async function getReliableTime() {
@@ -132,7 +124,7 @@
 
         async function fetchToken(nonce) {
             try {
-                const response = await fetch(`https://attestation.kubocloud.io/.well-known/attest/token?nonce=${nonce}`);
+                const response = await fetch(`/.well-known/attest/token?nonce=${nonce}`);
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -145,7 +137,7 @@
 
         async function fetchReferenceState() {
             try {
-                const response = await fetch("https://attestation.kubocloud.io/.well-known/attest/reference");
+                const response = await fetch("/.well-known/attest/reference");
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
@@ -178,6 +170,153 @@
                 throw new Error("Failed to import public key");
             }
         }
+
+        //===============================================
+        // Rendering
+        //===============================================
+
+        const templates = {
+            claimValue: (label, value, description = '') => `
+                <div>
+                    <strong>${label}:</strong>
+                    <div class="claim-value">${value}</div>
+                    ${description ? `<div class="description">${description}</div>` : ''}
+                </div>
+            `,
+            timelineItem: (label, value) => `
+                <div class="timeline-item">
+                    <div class="timeline-label">${label}</div>
+                    <div class="timeline-value">${value}</div>
+                </div>
+            `,
+            referenceCheck: (resultBadge, description, expected, actual) => `
+                <div>${resultBadge} <strong>${description}</strong></div>
+                <div class="values-container">
+                    <div class="value-row">
+                        <span class="value-label">Expected:</span>
+                        <span class="value-content">${expected || '(empty)'}</span>
+                    </div>
+                    <div class="value-row">
+                        <span class="value-label">Actual:</span>
+                        <span class="value-content">${actual || '(empty)'}</span>
+                    </div>
+                </div>
+            `,
+            browserInstructions: (steps) => `
+                <ol>
+                    ${steps.map(step => `<li>${step}</li>`).join('')}
+                </ol>
+            `
+        };
+
+        const timeUtils = {
+            formatDate: (timestamp) => {
+                const date = new Date(timestamp * 1000);
+                return date.toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZone: 'UTC',
+                    timeZoneName: 'short'
+                });
+            },
+            getRelativeTime: (diffSeconds) => {
+                const timeUnits = [
+                    { unit: 'day', seconds: 86400 },
+                    { unit: 'hour', seconds: 3600 },
+                    { unit: 'minute', seconds: 60 }
+                ];
+                
+                let relativeTime = diffSeconds >= 0 ? 'in ' : '';
+                let seconds = Math.abs(diffSeconds);
+                
+                for (const { unit, seconds: unitSeconds } of timeUnits) {
+                    const count = Math.floor(seconds / unitSeconds);
+                    if (count > 0) {
+                        relativeTime += `${count} ${unit}${count !== 1 ? 's' : ''} `;
+                        seconds %= unitSeconds;
+                    }
+                }
+                
+                if (seconds > 0 || relativeTime === '' || relativeTime === 'in ') {
+                    relativeTime += `${seconds} second${seconds !== 1 ? 's' : ''}`;
+                }
+                
+                return diffSeconds < 0 ? `${relativeTime} ago` : relativeTime;
+            }
+        };
+
+        const browserUtils = {
+            detectBrowser: () => {
+                const userAgent = navigator.userAgent;
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+                
+                if (isMobile) {
+                    if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) return "MobileSafari";
+                    if (userAgent.includes("Firefox")) return "MobileFirefox";
+                    if (userAgent.includes("Chrome") || userAgent.includes("Edg")) return "MobileChrome";
+                    return "MobileOther";
+                }
+                
+                if (userAgent.includes("Firefox")) return "Firefox";
+                if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) return "Safari";
+                if (userAgent.includes("Chrom") || userAgent.includes("Edg")) return "Chrome";
+                return "Unknown";
+            },
+            getBrowserInstructions: (browser) => {
+                const instructionSteps = {
+                    Chrome: [
+                        "Click the padlock icon in the address bar",
+                        "Click \"Connection is secure\"",
+                        "Click \"Certificate is valid\"",
+                        "Go to the \"Details\" tab",
+                        "Scroll down to find \"Thumbprint\" (SHA-1)"
+                    ],
+                    Firefox: [
+                        "Click the padlock icon in the address bar",
+                        "Click the \">\" arrow next to \"Connection secure\"",
+                        "Click \"More Information\"",
+                        "In the Security tab, click \"View Certificate\"",
+                        "Go to the \"Details\" tab",
+                        "Find \"Fingerprint (SHA-1)\""
+                    ],
+                    Safari: [
+                        "Click the padlock icon in the address bar",
+                        "Click \"Show Certificate\"",
+                        "Click \"Details\"",
+                        "Find \"SHA-1 Certificate Fingerprint\""
+                    ],
+                    MobileChrome: [
+                        "Tap the padlock icon in the address bar",
+                        "Tap \"Certificate\"",
+                        "Scroll down to find \"SHA-1 fingerprint\""
+                    ],
+                    MobileFirefox: [
+                        "Tap the padlock icon in the address bar",
+                        "Tap \"Show certificate\"",
+                        "Scroll down to find \"SHA-1 Fingerprint\""
+                    ],
+                    MobileSafari: [
+                        "Tap the \"aA\" or padlock icon in the address bar",
+                        "Tap \"Website Security\"",
+                        "Tap \"Certificate\"",
+                        "Scroll down to find \"SHA-1 Fingerprint\""
+                    ],
+                    default: [
+                        "Click/tap the padlock icon in the address bar",
+                        "Look for certificate or security information",
+                        "Find the certificate details",
+                        "Look for SHA-1 fingerprint or thumbprint"
+                    ]
+                };
+                
+                return templates.browserInstructions(instructionSteps[browser] || instructionSteps.default);
+            }
+        };
+
 
         function performReferenceChecks(claims, reference) {
             const results = [];
@@ -263,21 +402,10 @@
                 const checkDiv = document.createElement('div');
                 checkDiv.className = 'check-item';
 
-                // Add browser instructions specifically in the Certificate Check section
                 if (check.description === "Certificate Check") {
                     const browser = detectBrowser();
                     checkDiv.innerHTML = `
-                        <div>${resultBadge.outerHTML} <strong>${check.description}</strong></div>
-                        <div class="values-container">
-                            <div class="value-row">
-                                <span class="value-label">Expected:</span>
-                                <span class="value-content">${check.expected || '(empty)'}</span>
-                            </div>
-                            <div class="value-row">
-                                <span class="value-label">Actual:</span>
-                                <span class="value-content">${check.actual || '(empty)'}</span>
-                            </div>
-                        </div>
+                        ${templates.referenceCheck(resultBadge.outerHTML, check.description, check.expected, check.actual)}
                         <div class="certificate-verification-guide">
                             <details class="verification-details">
                                 <summary class="verification-summary">
@@ -294,19 +422,7 @@
                         </div>
                     `;
                 } else {
-                    checkDiv.innerHTML = `
-                        <div>${resultBadge.outerHTML} <strong>${check.description}</strong></div>
-                        <div class="values-container">
-                            <div class="value-row">
-                                <span class="value-label">Expected:</span>
-                                <span class="value-content">${check.expected || '(empty)'}</span>
-                            </div>
-                            <div class="value-row">
-                                <span class="value-label">Actual:</span>
-                                <span class="value-content">${check.actual || '(empty)'}</span>
-                            </div>
-                        </div>
-                    `;
+                    checkDiv.innerHTML = templates.referenceCheck(resultBadge.outerHTML, check.description, check.expected, check.actual);
                 }
                 section.appendChild(checkDiv);
             });
@@ -339,83 +455,34 @@
         }
 
         function formatTimestamp(unixTimestamp, claimKey) {
-            function getFormattedTime() {
-                const date = new Date(unixTimestamp * 1000);
-                const now = Date.UTC(
-                    new Date().getUTCFullYear(),
-                    new Date().getUTCMonth(),
-                    new Date().getUTCDate(),
-                    new Date().getUTCHours(),
-                    new Date().getUTCMinutes(),
-                    new Date().getUTCSeconds()
-                );
-                const diffSeconds = Math.round((unixTimestamp * 1000 - now) / 1000);
-                
-                // Date formatting options
-                const options = { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: 'numeric', 
-                    minute: '2-digit', 
-                    hour12: true,
-                    timeZone: 'UTC',
-                    timeZoneName: 'short'
-                };
-                const formattedDate = date.toLocaleString('en-US', options);
+            const date = new Date(unixTimestamp * 1000);
+            const now = Date.UTC(
+                new Date().getUTCFullYear(),
+                new Date().getUTCMonth(),
+                new Date().getUTCDate(),
+                new Date().getUTCHours(),
+                new Date().getUTCMinutes(),
+                new Date().getUTCSeconds()
+            );
+            const diffSeconds = Math.round((unixTimestamp * 1000 - now) / 1000);
+            
+            const formattedDate = timeUtils.formatDate(unixTimestamp);
+            const relativeTime = timeUtils.getRelativeTime(diffSeconds);
+            
+            const html = `
+                <div class="timestamp">
+                    <span class="${claimKey === 'exp' && diffSeconds < 0 ? 'expired' : ''}">
+                        ${formattedDate}
+                    </span>
+                    <span class="relative-time" data-timestamp="${unixTimestamp}">(${relativeTime})</span>
+                </div>
+            `;
 
-                // Calculate time difference
-                const timeUnits = [
-                    { unit: 'day', seconds: 86400 },
-                    { unit: 'hour', seconds: 3600 },
-                    { unit: 'minute', seconds: 60 }
-                ];
-                
-                let relativeTime = '';
-                if (diffSeconds >= 0) {
-                    relativeTime = 'in ';
-                } else {
-                    relativeTime = '';
-                }
-                
-                let seconds = Math.abs(diffSeconds);
-                for (const { unit, seconds: unitSeconds } of timeUnits) {
-                    const count = Math.floor(seconds / unitSeconds);
-                    if (count > 0) {
-                        relativeTime += `${count} ${unit}${count !== 1 ? 's' : ''} `;
-                        seconds %= unitSeconds;
-                    }
-                }
-                
-                if (seconds > 0 || relativeTime === '' || relativeTime === 'in ') {
-                    relativeTime += `${seconds} second${seconds !== 1 ? 's' : ''}`;
-                }
-
-                if (diffSeconds < 0) {
-                    relativeTime += ' ago';
-                }
-                
-                return {
-                    html: `
-                        <div class="timestamp">
-                            <span class="${claimKey === 'exp' && diffSeconds < 0 ? 'expired' : ''}">
-                                ${formattedDate}
-                            </span>
-                            <span class="relative-time" data-timestamp="${unixTimestamp}">(${relativeTime})</span>
-                        </div>
-                    `,
-                    relativeTime: relativeTime
-                };
-            }
-
-            // Initial render
-            const initialResult = getFormattedTime();
             const timestampElement = document.createElement('div');
-            timestampElement.innerHTML = initialResult.html;
+            timestampElement.innerHTML = html;
             
             const relativeTimeSpan = timestampElement.querySelector('.relative-time');
             if (relativeTimeSpan) {
-                // Store timestamp and key as data attributes
                 relativeTimeSpan.dataset.unixTimestamp = unixTimestamp;
                 relativeTimeSpan.dataset.claimKey = claimKey;
             }
@@ -545,31 +612,11 @@
         }
 
         function detectBrowser() {
-            const userAgent = navigator.userAgent;
-            
-            // Check if mobile
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-            
-            if (isMobile) {
-                if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) {
-                    return "MobileSafari";
-                } else if (userAgent.includes("Firefox")) {
-                    return "MobileFirefox";
-                } else if (userAgent.includes("Chrome") || userAgent.includes("Edg")) {
-                    return "MobileChrome";
-                }
-                return "MobileOther";
-            }
-            
-            // Desktop browsers
-            if (userAgent.includes("Firefox")) {
-                return "Firefox";
-            } else if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) {
-                return "Safari";
-            } else if (userAgent.includes("Chrom") || userAgent.includes("Edg")) {
-                return "Chrome";
-            }
-            return "Unknown";
+            return browserUtils.detectBrowser();
+        }
+
+        function getBrowserSpecificInstructions(browser) {
+            return browserUtils.getBrowserInstructions(browser);
         }
 
         function startTimerUpdates() {
@@ -817,108 +864,28 @@
 
             if (key === 'x-ms-azurevm-attested-pcrs' && Array.isArray(value)) {
                 group.innerHTML = `
-                    <div><strong>${label}:</strong></div>
-                    <div class="pcr-list">
-                        ${value.map(pcr => `<div class="pcr-item">PCR ${pcr}</div>`).join('')}
-                    </div>
-                    ${desc ? `<div class="description">${desc}</div>` : ''}
+                    ${templates.claimValue(label, `
+                        <div class="pcr-list">
+                            ${value.map(pcr => `<div class="pcr-item">PCR ${pcr}</div>`).join('')}
+                        </div>
+                    `, desc)}
                 `;
             } else if (typeof value === 'object' && value !== null) {
-                group.innerHTML = `<div><strong>${label}:</strong></div>`;
+                group.innerHTML = templates.claimValue(label, '', desc);
                 if (sectionName === 'isolationTee') {
                     group.appendChild(formatNestedObject(value, 0, isolationTeeLabels));
                 } else {
                     group.appendChild(formatNestedObject(value));
-                }
-                if (desc) {
-                    group.innerHTML += `<div class="description">${desc}</div>`;
                 }
             } else {
                 let formattedValue = formatValue(value, key);
                 if (typeof value === 'boolean') {
                     formattedValue = createSecurityBadge(value).outerHTML;
                 }
-                
-                group.innerHTML = `
-                    <div>
-                        <strong>${label}:</strong>
-                        <div class="claim-value">${formattedValue}</div>
-                        ${desc ? `<div class="description">${desc}</div>` : ''}
-                    </div>
-                `;
+                group.innerHTML = templates.claimValue(label, formattedValue, desc);
             }
 
             return group;
-        }
-
-        function getBrowserSpecificInstructions(browser) {
-            switch(browser) {
-                case "Chrome":
-                    return `
-                        <ol>
-                            <li>Click the padlock icon in the address bar</li>
-                            <li>Click "Connection is secure"</li>
-                            <li>Click "Certificate is valid"</li>
-                            <li>Go to the "Details" tab</li>
-                            <li>Scroll down to find "Thumbprint" (SHA-1)</li>
-                        </ol>`;
-                case "MobileChrome":
-                    return `
-                        <ol>
-                            <li>Tap the padlock icon in the address bar</li>
-                            <li>Tap "Certificate"</li>
-                            <li>Scroll down to find "SHA-1 fingerprint"</li>
-                        </ol>`;
-                case "Firefox":
-                    return `
-                        <ol>
-                            <li>Click the padlock icon in the address bar</li>
-                            <li>Click the ">" arrow next to "Connection secure"</li>
-                            <li>Click "More Information"</li>
-                            <li>In the Security tab, click "View Certificate"</li>
-                            <li>Go to the "Details" tab</li>
-                            <li>Find "Fingerprint (SHA-1)"</li>
-                        </ol>`;
-                case "MobileFirefox":
-                    return `
-                        <ol>
-                            <li>Tap the padlock icon in the address bar</li>
-                            <li>Tap "Show certificate"</li>
-                            <li>Scroll down to find "SHA-1 Fingerprint"</li>
-                        </ol>`;
-                case "Safari":
-                    return `
-                        <ol>
-                            <li>Click the padlock icon in the address bar</li>
-                            <li>Click "Show Certificate"</li>
-                            <li>Click "Details"</li>
-                            <li>Find "SHA-1 Certificate Fingerprint"</li>
-                        </ol>`;
-                case "MobileSafari":
-                    return `
-                        <ol>
-                            <li>Tap the "aA" or padlock icon in the address bar</li>
-                            <li>Tap "Website Security"</li>
-                            <li>Tap "Certificate"</li>
-                            <li>Scroll down to find "SHA-1 Fingerprint"</li>
-                        </ol>`;
-                case "MobileOther":
-                    return `
-                        <ol>
-                            <li>Tap the padlock or security icon in the address bar</li>
-                            <li>Look for certificate or security information</li>
-                            <li>Find the certificate details</li>
-                            <li>Look for SHA-1 fingerprint or thumbprint</li>
-                        </ol>`;
-                default:
-                    return `
-                        <ol>
-                            <li>Click/tap the padlock icon in the address bar</li>
-                            <li>Look for certificate or security information</li>
-                            <li>Find the certificate details</li>
-                            <li>Look for SHA-1 fingerprint or thumbprint</li>
-                        </ol>`;
-            }
         }
 
         function displayClaims(claims, validation, referenceState) {
@@ -1006,36 +973,21 @@
             if (iatClaim) {
                 const [key, value] = iatClaim;
                 const label = humanLabels[key]?.label || key;
-                timelineDiv.innerHTML += `
-                    <div class="timeline-item">
-                        <div class="timeline-label">${label}</div>
-                        <div class="timeline-value">${formatTimestamp(value, key)}</div>
-                    </div>
-                `;
+                timelineDiv.innerHTML += templates.timelineItem(label, formatTimestamp(value, key));
             }
             
             // Add Not Valid Before only if different from Issued At
             if (nbfClaim && (!iatClaim || nbfClaim[1] !== iatClaim[1])) {
                 const [key, value] = nbfClaim;
                 const label = humanLabels[key]?.label || key;
-                timelineDiv.innerHTML += `
-                    <div class="timeline-item">
-                        <div class="timeline-label">${label}</div>
-                        <div class="timeline-value">${formatTimestamp(value, key)}</div>
-                    </div>
-                `;
+                timelineDiv.innerHTML += templates.timelineItem(label, formatTimestamp(value, key));
             }
             
             // Add Expiration
             if (expClaim) {
                 const [key, value] = expClaim;
                 const label = humanLabels[key]?.label || key;
-                timelineDiv.innerHTML += `
-                    <div class="timeline-item">
-                        <div class="timeline-label">${label}</div>
-                        <div class="timeline-value">${formatTimestamp(value, key)}</div>
-                    </div>
-                `;
+                timelineDiv.innerHTML += templates.timelineItem(label, formatTimestamp(value, key));
             }
             
             section.appendChild(timelineDiv);
