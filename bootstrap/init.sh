@@ -129,4 +129,4 @@ systemctl enable docker
 docker build $BUILD_ARGS -f $AAPPDOCKERFILE -t aapp-image .
 
 # Run the Docker container in the background
-docker run -d -p $AAPPPORT:$AAPPPORT  aapp-image
+docker run -d -p $AAPPPORT:$AAPPPORT --restart=always aapp-image
