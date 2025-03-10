@@ -99,24 +99,16 @@ cd aapp-code
 git checkout tags/$AAPPTAG
 
 AAPPDOCKERFILE=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.dockerfile')
-ENCODED_BUILD_ARGS=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.args')
-if [[ -z "$ENCODED_BUILD_ARGS" || "$ENCODED_BUILD_ARGS" == "null" ]]; then
-    echo "Error: No valid base64 content found in JSON file!"
-    exit 1
-fi
-
-# Decode and store it into a aapp.args file
-echo "$ENCODED_BUILD_ARGS" | base64 --decode > aapp.args
+BUILD_ARGS_JSON=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.args')
 
 BUILD_ARGS=""
 
-# Read and process the aapp.args file and ensure proper line endings
-sed -i 's/\r$//' aapp.args
-while IFS='=' read -r key value || [ -n "$key" ]; do
-    key=$(echo "$key" | xargs)
-    value=$(echo "$value" | xargs)
-    BUILD_ARGS+=" --build-arg $key=$value"
-done < <(cat "aapp.args"; echo)
+# Parse JSON and construct Docker build arguments
+while IFS="=" read -r key value; do
+    key=$(echo "$key" | xargs)  # Trim spaces
+    value=$(echo "$value" | xargs)  # Trim spaces
+    BUILD_ARGS+=" --build-arg $key=\"$value\""
+done < <(echo "$BUILD_ARGS_JSON" | jq -r 'to_entries | map("\(.key)=\(.value)") | .[]')
 
 # Install docker
 apt-get update -yq
