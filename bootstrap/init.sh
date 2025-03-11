@@ -105,9 +105,9 @@ BUILD_ARGS=""
 
 # Parse JSON and construct Docker build arguments
 while IFS="=" read -r key value; do
-    key=$(echo "$key" | xargs)  # Trim spaces
-    value=$(echo "$value" | xargs)  # Trim spaces
-    BUILD_ARGS+=" --build-arg $key=\"$value\""
+    key=$(echo "$key" | xargs)
+    value=$(echo "$value" | xargs)
+    BUILD_ARGS+=" --build-arg $key=$value"
 done < <(echo "$BUILD_ARGS_JSON" | jq -r 'to_entries | map("\(.key)=\(.value)") | .[]')
 
 # Install docker
