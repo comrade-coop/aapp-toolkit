@@ -124,9 +124,15 @@ while IFS="=" read -r key value; do
     BUILD_ARGS+=" --build-arg $key=$value"
 done < <(echo "$BUILD_ARGS_JSON" | jq -r 'to_entries | map("\(.key)=\(.value)") | .[]')
 
-# Install docker
-apt-get update -yq
-apt-get install -yq docker.io
+# Install docker from official docker repository
+apt update
+apt install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo tee /etc/apt/keyrings/docker.asc > /dev/null
+chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt update
+apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 systemctl start docker
 systemctl enable docker
