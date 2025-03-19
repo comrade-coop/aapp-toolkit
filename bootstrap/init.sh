@@ -32,12 +32,17 @@ subjectAltName = @alt_names
 [ alt_names ]
 EOF
 
+NGINX_SERVER_NAMES=""
+
 # Append all hostnames to alt_names section
 COUNT=1
 for HOST in $HOSTNAMES; do
   echo "DNS.$COUNT = $HOST" >> "$OPENSSL_CONF"
+  NGINX_SERVER_NAMES+="$HOST "
   COUNT=$((COUNT + 1))
 done
+
+NGINX_SERVER_NAMES=$(echo "$NGINX_SERVER_NAMES" | xargs)
 
 openssl req -new -newkey rsa:2048 -nodes -keyout "$KEY_FILE" -out "$CSR_FILE" -config "$OPENSSL_CONF" -subj "/CN=$DNS_ROOT"
 
@@ -79,8 +84,8 @@ AAPPPORT=$(echo "$USER_DATA_JSON" | jq -r '.spec.ingress.port')
 AAPPREPO=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.repo')
 AAPPTAG=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.tag')
 
-sed -i "s|__AAPPHOSTNAME__|${DNS_ROOT}|g" "$NGINX_CONFIG"
-sed -i "s|__AAPPPORT__|${AAPPPORT}|g" "$NGINX_CONFIG"
+sed -i "s|__DNS_ROOT__|${DNS_ROOT}|g" "$NGINX_CONFIG"
+sed -i "s|__NGINX_SERVER_NAMES__|${NGINX_SERVER_NAMES}|g" "$NGINX_CONFIG"
 
 cp azure-attestation/scripts/token.sh /var/www/html/
 chmod +x /var/www/html/token.sh
@@ -146,4 +151,4 @@ for row in $(echo "${VOLUMES}" | jq -c '.[]'); do
   MOUNT_OPTS="$MOUNT_OPTS -v $(realpath $HOST_DIR):$MOUNT"
 done
 
-docker run -d -p $AAPPPORT:$AAPPPORT $MOUNT_OPTS --restart=always aapp-image
+docker run -d -p 3000:$AAPPPORT $MOUNT_OPTS --restart=always aapp-image
