@@ -7,7 +7,10 @@ mkdir -p /var/www/html
 
 echo -n "$USER_DATA_JSON" | sha1sum | awk '{print $1}' > /var/www/html/manifest.sha1
 
-DNS_ROOT=$(echo "$USER_DATA_JSON" | jq -r '.spec.ingress.hostname')
+HOSTNAMES=$(echo "$USER_DATA_JSON" | jq -r '.spec.ingress.hostnames[]')
+
+# Pick the first hostname as the primary CN
+DNS_ROOT=$(echo "$HOSTNAMES" | head -n 1)
 
 OPENSSL_CONF="openssl.cnf"
 CSR_FILE="${DNS_ROOT}.csr"
@@ -27,8 +30,14 @@ CN = $DNS_ROOT
 subjectAltName = @alt_names
 
 [ alt_names ]
-DNS.1 = $DNS_ROOT
 EOF
+
+# Append all hostnames to alt_names section
+COUNT=1
+for HOST in $HOSTNAMES; do
+  echo "DNS.$COUNT = $HOST" >> "$OPENSSL_CONF"
+  COUNT=$((COUNT + 1))
+done
 
 openssl req -new -newkey rsa:2048 -nodes -keyout "$KEY_FILE" -out "$CSR_FILE" -config "$OPENSSL_CONF" -subj "/CN=$DNS_ROOT"
 
@@ -120,5 +129,21 @@ systemctl enable docker
 # Run the docker build command with extracted arguments
 docker build $BUILD_ARGS -f $AAPPDOCKERFILE -t aapp-image .
 
-# Run the Docker container in the background
-docker run -d -p $AAPPPORT:$AAPPPORT --restart=always aapp-image
+# Run the Docker container in the background with mounts
+cd /root
+VOLUMES=$(echo "$USER_DATA_JSON" | jq -c '.spec.container.volumes')
+
+MOUNT_OPTS=""
+for row in $(echo "${VOLUMES}" | jq -c '.[]'); do
+  NAME=$(echo "$row" | jq -r '.name')
+  MOUNT=$(echo "$row" | jq -r '.mount')
+
+  # Create directory
+  HOST_DIR="./volumes/$NAME"
+  mkdir -p "$HOST_DIR"
+
+  # Append mount option for Docker
+  MOUNT_OPTS="$MOUNT_OPTS -v $(realpath $HOST_DIR):$MOUNT"
+done
+
+docker run -d -p $AAPPPORT:$AAPPPORT $MOUNT_OPTS --restart=always aapp-image
