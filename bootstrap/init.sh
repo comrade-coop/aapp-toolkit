@@ -142,9 +142,8 @@ DOCKER_BUILDKIT=1 docker build $BUILD_ARGS -f $AAPPDOCKERFILE -t aapp-image .
 
 # Run the Docker container in the background with mounts
 cd /root
-VOLUMES=$(echo "$USER_DATA_JSON" | jq -c '.spec.container.volumes')
-
 MOUNT_OPTS=""
+VOLUMES=$(echo "$USER_DATA_JSON" | jq -c '.spec.container.volumes // []')
 for row in $(echo "${VOLUMES}" | jq -c '.[]'); do
   NAME=$(echo "$row" | jq -r '.name')
   MOUNT=$(echo "$row" | jq -r '.mount')
