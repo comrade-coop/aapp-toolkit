@@ -5,7 +5,7 @@ USER_DATA_JSON=$(echo "$USER_DATA_BASE64" | base64 --decode)
 
 mkdir -p /var/www/html
 
-echo -n "$USER_DATA_JSON" | sha1sum | awk '{print $1}' > /var/www/html/manifest.sha1
+echo "$USER_DATA_JSON" | sha1sum | awk '{print $1}' > /var/www/html/manifest.sha1
 
 HOSTNAMES=$(echo "$USER_DATA_JSON" | jq -r '.spec.ingress.hostnames[]')
 
