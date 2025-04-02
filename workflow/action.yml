@@ -23,6 +23,9 @@ inputs:
   vm_name:
     description: 'Name for the new VM'
     required: true
+  vm_disk_size:
+    description: 'Size of disk attached to the VM'
+    required: true
   vm_network_id:
     description: 'Azure VM Network ID'
     required: true
@@ -75,6 +78,7 @@ runs:
                         virtualMachineName="${{ inputs.vm_name }}" \
                         virtualNetworkId="${{ inputs.vm_network_id }}" \
                         subnetName="default" \
+                        diskSize=${{ inputs.vm_disk_size }} \
                         sshKeyName="${{ inputs.vm_dev_key }}" \
                         userData=@${{ inputs.aapp_manifest }} \
                         customData=@$cloud_init > $output_file

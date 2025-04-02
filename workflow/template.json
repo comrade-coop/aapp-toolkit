@@ -14,6 +14,12 @@
         "description": "The resource ID of the existing virtual network (for example: /subscriptions/<subId>/resourceGroups/<rgName>/providers/Microsoft.Network/virtualNetworks/<vnetName>)."
       }
     },
+    "diskSize": {
+      "type": "int",
+      "metadata": {
+        "description": "Size of the disk in GB to be created and attached."
+      }
+    },
     "subnetName": {
       "type": "string",
       "metadata": {
@@ -184,7 +190,8 @@
                 "securityEncryptionType": "DiskWithVMGuestState"
               }
             },
-            "deleteOption": "[variables('osDiskDeleteOption')]"
+            "deleteOption": "[variables('osDiskDeleteOption')]",
+            "diskSizeGB": "[parameters('diskSize')]"
           },
           "imageReference": {
             "publisher": "canonical",
