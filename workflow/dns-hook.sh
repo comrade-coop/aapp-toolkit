@@ -22,7 +22,7 @@ echo "The script will now poll DNS for the TXT record until it appears with the 
 echo "=================================================================="
 
 # Configuration: number of attempts and sleep interval (in seconds).
-MAX_ATTEMPTS=60
+MAX_ATTEMPTS=12
 SLEEP_TIME=10
 
 attempt=0
