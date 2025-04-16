@@ -156,4 +156,4 @@ for row in $(echo "${VOLUMES}" | jq -c '.[]'); do
   MOUNT_OPTS="$MOUNT_OPTS -v $(realpath $HOST_DIR):$MOUNT"
 done
 
-docker run -d -p 3000:$AAPPPORT $MOUNT_OPTS --restart=always aapp-image
+# docker run -d -p 3000:$AAPPPORT $MOUNT_OPTS --restart=always aapp-image
