@@ -91,11 +91,22 @@ const server = https.createServer(options, async (req, res) => {
     return res.end('Forbidden: JWT verification failed');
   }
 
-  // 3. Validate nonce in x-ms-runtime.client-payload.nonce
+  // 3. Validate nonce claim: base64-decode claim and compare to original nonce string
   const payload = verified.payload;
   const runtime = payload['x-ms-runtime'];
   const clientPayload = runtime && runtime['client-payload'];
-  if (!clientPayload || clientPayload.nonce !== nonce) {
+  if (!clientPayload || !clientPayload.nonce) {
+    res.writeHead(403);
+    return res.end('Forbidden: missing nonce in attestation payload');
+  }
+  let decodedNonce;
+  try {
+    decodedNonce = Buffer.from(clientPayload.nonce, 'base64').toString('utf8');
+  } catch (err) {
+    res.writeHead(403);
+    return res.end('Forbidden: invalid nonce encoding');
+  }
+  if (decodedNonce !== nonce) {
     res.writeHead(403);
     return res.end('Forbidden: nonce mismatch');
   }
