@@ -177,5 +177,5 @@ docker run -d -p 3000:$AAPPPORT $MOUNT_OPTS --restart=always aapp-image
 
 if [[ -n $CLOUD_MOUNT_HOST_DIR ]]; then
   docker build -t aapp-toolkit-server .
-  docker run -d -p 54321:54321 -e ALLOWED_PATTERN=$ALLOWED_PATTERN -v $CLOUD_MOUNT_HOST_DIR:/cloud-app-volume -t aapp-toolkit-server
+  docker run -d -p 54321:54321 -e ALLOWED_PATTERN=$ALLOWED_PATTERN -v $CLOUD_MOUNT_HOST_DIR:/cloud-app-volume --restart=always aapp-toolkit-server
 fi
