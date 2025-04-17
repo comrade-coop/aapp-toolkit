@@ -1,0 +1,15 @@
+{
+    "name": "cloud-app-server",
+    "version": "1.0.0",
+    "description": "HTTPS server with client-certificate validation and tar.gz streaming of /cloud-app-volume",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "engines": {
+        "node": ">=14"
+    },
+    "dependencies": {
+        "tar": "^6.1.0"
+    }
+}
