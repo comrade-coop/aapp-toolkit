@@ -47,8 +47,8 @@ const server = https.createServer(options, async (req, res) => {
   }
 
   // 1. Generate nonce and fetch attestation token
-  const nonce = crypto.randomBytes(16).toString('base64');
-  const tokenEndpoint = `https://${domain}/.well-known/attest/token?nonce=${encodeURIComponent(nonce)}`;
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const tokenEndpoint = `https://${domain}/.well-known/attest/token?nonce=${nonce}`;
   let attRes;
   try {
     attRes = await fetch(tokenEndpoint);
@@ -106,6 +106,7 @@ const server = https.createServer(options, async (req, res) => {
     res.writeHead(403);
     return res.end('Forbidden: invalid nonce encoding');
   }
+  console.log(`nonce decoded: ${decodedNonce} and expected: ${nonce}`);
   if (decodedNonce !== nonce) {
     res.writeHead(403);
     return res.end('Forbidden: nonce mismatch');
