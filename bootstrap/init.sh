@@ -8,6 +8,7 @@ mkdir -p /var/www/html
 echo "$USER_DATA_JSON" | sha1sum | awk '{print $1}' > /var/www/html/manifest.sha1
 
 HOSTNAMES=$(echo "$USER_DATA_JSON" | jq -r '.spec.ingress.hostnames[]')
+ALLOWED_PATTERN=$(echo "$USER_DATA_JSON" | jq -r '.spec.bootstrapping.pattern')
 
 # Pick the first hostname as the primary CN
 DNS_ROOT=$(echo "$HOSTNAMES" | head -n 1)
@@ -142,11 +143,13 @@ DOCKER_BUILDKIT=1 docker build $BUILD_ARGS -f $AAPPDOCKERFILE -t aapp-image .
 
 # Run the Docker container in the background with mounts
 cd /root
+CLOUD_MOUNT_HOST_DIR=""
 MOUNT_OPTS=""
 VOLUMES=$(echo "$USER_DATA_JSON" | jq -c '.spec.container.volumes // []')
 for row in $(echo "${VOLUMES}" | jq -c '.[]'); do
   NAME=$(echo "$row" | jq -r '.name')
   MOUNT=$(echo "$row" | jq -r '.mount')
+  TYPE=$(echo "$row" | jq -r '.type')
 
   # Create directory
   HOST_DIR="./volumes/$NAME"
@@ -154,6 +157,25 @@ for row in $(echo "${VOLUMES}" | jq -c '.[]'); do
 
   # Append mount option for Docker
   MOUNT_OPTS="$MOUNT_OPTS -v $(realpath $HOST_DIR):$MOUNT"
+
+  if [[ $TYPE == "cloud" ]]; then
+    CLOUD_MOUNT_HOST_DIR=$(realpath $HOST_DIR)
+  fi
 done
 
-# docker run -d -p 3000:$AAPPPORT $MOUNT_OPTS --restart=always aapp-image
+cp /root/aapp-toolkit/bootstrap/fullchain.pem /root/aapp-toolkit/bootstrap/server.pem
+cp /root/aapp-toolkit/${DNS_ROOT}.key /root/aapp-toolkit/bootstrap/server.key
+cd /root/aapp-toolkit/bootstrap
+
+BOOTSTRAPPING_PARENT=$(echo "$USER_DATA_JSON" | jq -c '.spec.bootstrapping.parent // ""')
+if [[ -n $BOOTSTRAPPING_PARENT ]]; then
+  curl -sSf --cert server.pem --key server.key https://$BOOTSTRAPPING_PARENT:54321 -o cloud-app-volume.tar.gz
+  tar -xzf cloud-app-volume.tar.gz --strip-components=1 -C $CLOUD_MOUNT_HOST_DIR
+fi
+
+docker run -d -p 3000:$AAPPPORT $MOUNT_OPTS --restart=always aapp-image
+
+if [[ -n $CLOUD_MOUNT_HOST_DIR ]]; then
+  docker build -t aapp-toolkit-server .
+  docker run -d -p 54321:54321 -e ALLOWED_PATTERN=$ALLOWED_PATTERN -v $CLOUD_MOUNT_HOST_DIR:/cloud-app-volume -t aapp-toolkit-server
+fi
