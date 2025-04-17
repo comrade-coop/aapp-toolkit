@@ -1,15 +1,16 @@
 {
     "name": "cloud-app-server",
     "version": "1.0.0",
-    "description": "HTTPS server with client-certificate validation and tar.gz streaming of /cloud-app-volume",
+    "description": "HTTPS server with client-certificate validation, wildcard matching, and attestation JWT verification",
     "main": "server.js",
     "scripts": {
-        "start": "node server.js"
+      "start": "node server.js"
     },
     "engines": {
-        "node": ">=14"
+      "node": ">=18"
     },
     "dependencies": {
-        "tar": "^6.1.0"
+      "tar": "^6.1.0",
+      "jose": "^4.14.4"
     }
-}
+  }
