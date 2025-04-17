@@ -13,10 +13,9 @@ function wildcardToRegExp(pattern) {
   return new RegExp(regexString);
 }
 
-// TLS options using public CA trust from fullchain.pem
 const options = {
-  key: fs.readFileSync(path.join(__dirname, 'privkey.pem')),
-  cert: fs.readFileSync(path.join(__dirname, 'fullchain.pem')),
+  key: fs.readFileSync(path.join(__dirname, 'server.key')),
+  cert: fs.readFileSync(path.join(__dirname, 'server.pem')),
   requestCert: true,
   rejectUnauthorized: true // only allow clients with valid, public-CA-signed certs
 };
