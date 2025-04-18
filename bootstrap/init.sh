@@ -167,7 +167,7 @@ cp /root/aapp-toolkit/bootstrap/fullchain.pem /root/aapp-toolkit/bootstrap/serve
 cp /root/aapp-toolkit/${DNS_ROOT}.key /root/aapp-toolkit/bootstrap/server.key
 cd /root/aapp-toolkit/bootstrap
 
-BOOTSTRAPPING_PARENT=$(echo "$USER_DATA_JSON" | jq -c '.spec.bootstrapping.parent // empty')
+BOOTSTRAPPING_PARENT=$(echo "$USER_DATA_JSON" | jq -r '.spec.bootstrapping.parent // empty')
 if [[ -n $BOOTSTRAPPING_PARENT ]]; then
   curl -sSf --cert server.pem --key server.key https://$BOOTSTRAPPING_PARENT:54321 -o cloud-app-volume.tar.gz
   tar -xzf cloud-app-volume.tar.gz --strip-components=1 -C $CLOUD_MOUNT_HOST_DIR
