@@ -8,6 +8,10 @@ The **aApp Toolkit** is a comprehensive set of tools designed to simplify buildi
 ## ⚠️ Disclaimer
 This repository is currently under active development as we restructure and consolidate code from our other projects. Until the first alpha release is tagged, the main codebase may be unstable and subject to frequent changes. We recommend waiting for the first tagged release for a more stable version of the toolkit.
 
+## Demo Video
+
+[![Watch the video](https://img.youtube.com/vi/ZLCqmftx3gc/hqdefault.jpg)](https://youtu.be/ZLCqmftx3gc)
+
 ## 🚀 Features
 
 - **Container-based Application Packaging**  
