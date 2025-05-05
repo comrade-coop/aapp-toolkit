@@ -1,8 +1,8 @@
 {
   "reference": {
     "attestation-type": "sevsnpvm",
-    "measurement": "9f21f23f03f7722555bc98d8524c3663",
-    "host-data": "e78567924a4bc3a1a0986563217dc075b74cccf5761fa3fd7e7d5595b4a84bd0",
+    "measurement": "0b06bca8126298fd9fade4d3aeba6f01",
+    "host-data": "955b1101320213d8e1f6468129fdcf8aadb740801a6712f8eb73f7aa9067dda4",
     "vmid": "__VMID__",
     "manifest": "__AAPPMANIFESTSHA1__",
     "certificate": "__AAPPCERTSHA1__"
