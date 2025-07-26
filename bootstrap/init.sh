@@ -139,7 +139,7 @@ systemctl start docker
 systemctl enable docker
 
 # Run the docker build command with extracted arguments
-DOCKER_BUILDKIT=1 docker build $BUILD_ARGS -f $AAPPDOCKERFILE -t aapp-image .
+docker build $BUILD_ARGS -f $AAPPDOCKERFILE -t aapp-image .
 
 # Run the Docker container in the background with mounts
 cd /root
