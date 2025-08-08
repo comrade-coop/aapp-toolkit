@@ -169,7 +169,8 @@ cd /root/aapp-toolkit/bootstrap
 
 BOOTSTRAPPING_PARENT=$(echo "$USER_DATA_JSON" | jq -r '.spec.bootstrapping.parent // empty')
 if [[ -n $BOOTSTRAPPING_PARENT ]]; then
-  curl -sSf --cert server.pem --key server.key https://$BOOTSTRAPPING_PARENT:54321 -o cloud-app-volume.tar.gz
+  # Handle the case when bootstrapping parent certificate is expired
+  curl -sSf --cert server.pem --key server.key -k https://$BOOTSTRAPPING_PARENT:54321 -o cloud-app-volume.tar.gz
   tar -xzf cloud-app-volume.tar.gz --strip-components=1 -C $CLOUD_MOUNT_HOST_DIR
 fi
 
