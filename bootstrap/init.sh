@@ -1,12 +1,23 @@
 #!/bin/bash
 
+# Simple logging function
+LOG_FILE="/var/www/html/logs.txt"
+mkdir -p /var/www/html
+touch "$LOG_FILE"
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+}
+
+log "Starting bootstrap script..."
+
+log "Fetching user data from Azure metadata service..."
 USER_DATA_BASE64=$(curl -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/userData?api-version=2021-01-01&format=text")
 USER_DATA_JSON=$(echo "$USER_DATA_BASE64" | base64 --decode)
 
-mkdir -p /var/www/html
-
+log "Writing manifest SHA1..."
 echo "$USER_DATA_JSON" | sha1sum | awk '{print $1}' > /var/www/html/manifest.sha1
 
+log "Extracting hostnames and allowed pattern..."
 HOSTNAMES=$(echo "$USER_DATA_JSON" | jq -r '.spec.ingress.hostnames[]')
 ALLOWED_PATTERN=$(echo "$USER_DATA_JSON" | jq -r '.spec.bootstrapping.pattern')
 
@@ -17,6 +28,7 @@ OPENSSL_CONF="openssl.cnf"
 CSR_FILE="${DNS_ROOT}.csr"
 KEY_FILE="${DNS_ROOT}.key"
 
+log "Creating OpenSSL configuration..."
 cat > "$OPENSSL_CONF" <<EOF
 [ req ]
 default_bits       = 2048
@@ -34,9 +46,8 @@ subjectAltName = @alt_names
 EOF
 
 NGINX_SERVER_NAMES=""
-
-# Append all hostnames to alt_names section
 COUNT=1
+log "Appending SAN hostnames to OpenSSL config..."
 for HOST in $HOSTNAMES; do
   echo "DNS.$COUNT = $HOST" >> "$OPENSSL_CONF"
   NGINX_SERVER_NAMES+="$HOST "
@@ -45,26 +56,27 @@ done
 
 NGINX_SERVER_NAMES=$(echo "$NGINX_SERVER_NAMES" | xargs)
 
+log "Generating CSR..."
 openssl req -new -newkey rsa:2048 -nodes -keyout "$KEY_FILE" -out "$CSR_FILE" -config "$OPENSSL_CONF" -subj "/CN=$DNS_ROOT"
 
 CSR_BASE64=$(base64 -w 0 "$CSR_FILE")
 
+log "Building azure-attestation app..."
 cd azure-attestation/app
-
 bash pre-requisites.sh
 cmake .
 make
 
-# sudo ./AttestationClient -c "$CSR_BASE64" -m "$USER_DATA_BASE64" -o token
-
+log "Building bootstrap server..."
 cd ../../bootstrap
-
 cmake .
 make
 
+log "Saving CSR..."
 echo $CSR_BASE64 > csr.txt
- ./server
+./server
 
+log "Extracting certificate fingerprint..."
 awk '
   /-----BEGIN CERTIFICATE-----/ {flag=1}
   flag {print}
@@ -73,12 +85,13 @@ awk '
 
 cd ../
 
+log "Installing NGINX..."
 apt-get update -yq
 apt-get install -yq nginx
 apt-get install -yq libnginx-mod-http-lua
 
 NGINX_CONFIG="/etc/nginx/sites-available/default"
-
+log "Configuring NGINX..."
 cp -f ingress/default.conf $NGINX_CONFIG
 
 AAPPPORT=$(echo "$USER_DATA_JSON" | jq -r '.spec.ingress.port')
@@ -88,26 +101,23 @@ AAPPTAG=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.tag')
 sed -i "s|__DNS_ROOT__|${DNS_ROOT}|g" "$NGINX_CONFIG"
 sed -i "s|__NGINX_SERVER_NAMES__|${NGINX_SERVER_NAMES}|g" "$NGINX_CONFIG"
 
+log "Copying web resources..."
 cp azure-attestation/scripts/token.sh /var/www/html/
 chmod +x /var/www/html/token.sh
 cp azure-attestation/web/index.html /var/www/html/
 cp /root/aapp-toolkit/bootstrap/reference.json /var/www/html/
 chown www-data:www-data /var/www/html/*
 
-# Define the file that will be created in /etc/sudoers.d
+log "Granting sudo access to www-data for AttestationClient..."
 SUDOERS_FILE="/etc/sudoers.d/www-data-attestation"
-
-# Define the command for which www-data will have passwordless sudo access
 COMMAND="/root/aapp-toolkit/azure-attestation/app/AttestationClient"
-
-# Create the sudoers entry
 echo "www-data ALL=(ALL) NOPASSWD: ${COMMAND}" > "$SUDOERS_FILE"
-
-# Set proper permissions for the sudoers file
 chmod 0440 "$SUDOERS_FILE"
 
 service nginx restart
+log "NGINX restarted."
 
+log "Cloning application repo: $AAPPREPO (tag: $AAPPTAG)..."
 cd /root
 git clone $AAPPREPO aapp-code
 cd aapp-code
@@ -117,15 +127,14 @@ AAPPDOCKERFILE=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.dockerfil
 BUILD_ARGS_JSON=$(echo "$USER_DATA_JSON" | jq -r '.spec.container.build.args')
 
 BUILD_ARGS=""
-
-# Parse JSON and construct Docker build arguments
+log "Parsing Docker build arguments..."
 while IFS="=" read -r key value; do
     key=$(echo "$key" | xargs)
     value=$(echo "$value" | xargs)
     BUILD_ARGS+=" --build-arg $key=$value"
 done < <(echo "$BUILD_ARGS_JSON" | jq -r 'to_entries | map("\(.key)=\(.value)") | .[]')
 
-# Install docker from official docker repository
+log "Installing Docker..."
 apt update
 apt install -y ca-certificates curl gnupg
 sudo install -m 0755 -d /etc/apt/keyrings
@@ -138,10 +147,10 @@ apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker
 systemctl start docker
 systemctl enable docker
 
-# Run the docker build command with extracted arguments
+log "Building Docker image..."
 docker build $BUILD_ARGS -f $AAPPDOCKERFILE -t aapp-image .
 
-# Run the Docker container in the background with mounts
+log "Preparing Docker volumes..."
 cd /root
 CLOUD_MOUNT_HOST_DIR=""
 MOUNT_OPTS=""
@@ -151,11 +160,8 @@ for row in $(echo "${VOLUMES}" | jq -c '.[]'); do
   MOUNT=$(echo "$row" | jq -r '.mount')
   TYPE=$(echo "$row" | jq -r '.type')
 
-  # Create directory
   HOST_DIR="./volumes/$NAME"
   mkdir -p "$HOST_DIR"
-
-  # Append mount option for Docker
   MOUNT_OPTS="$MOUNT_OPTS -v $(realpath $HOST_DIR):$MOUNT"
 
   if [[ $TYPE == "cloud" ]]; then
@@ -163,20 +169,25 @@ for row in $(echo "${VOLUMES}" | jq -c '.[]'); do
   fi
 done
 
+log "Copying server certificates..."
 cp /root/aapp-toolkit/bootstrap/fullchain.pem /root/aapp-toolkit/bootstrap/server.pem
 cp /root/aapp-toolkit/${DNS_ROOT}.key /root/aapp-toolkit/bootstrap/server.key
 cd /root/aapp-toolkit/bootstrap
 
 BOOTSTRAPPING_PARENT=$(echo "$USER_DATA_JSON" | jq -r '.spec.bootstrapping.parent // empty')
 if [[ -n $BOOTSTRAPPING_PARENT ]]; then
-  # Handle the case when bootstrapping parent certificate is expired
+  log "Downloading volume from parent: $BOOTSTRAPPING_PARENT"
   curl -sSf --cert server.pem --key server.key -k https://$BOOTSTRAPPING_PARENT:54321 -o cloud-app-volume.tar.gz
   tar -xzf cloud-app-volume.tar.gz --strip-components=1 -C $CLOUD_MOUNT_HOST_DIR
 fi
 
+log "Starting main application container..."
 docker run -d -p 3000:$AAPPPORT $MOUNT_OPTS --restart=always aapp-image
 
 if [[ -n $CLOUD_MOUNT_HOST_DIR ]]; then
+  log "Starting cloud volume server..."
   docker build -t aapp-toolkit-server .
   docker run -d -p 54321:54321 -e ALLOWED_PATTERN=$ALLOWED_PATTERN -v $CLOUD_MOUNT_HOST_DIR:/cloud-app-volume --restart=always aapp-toolkit-server
 fi
+
+log "Bootstrap script completed successfully."
