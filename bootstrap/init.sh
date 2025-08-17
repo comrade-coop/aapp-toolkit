@@ -190,4 +190,15 @@ if [[ -n $CLOUD_MOUNT_HOST_DIR ]]; then
   docker run -d -p 54321:54321 -e ALLOWED_PATTERN=$ALLOWED_PATTERN -v $CLOUD_MOUNT_HOST_DIR:/cloud-app-volume --restart=always aapp-toolkit-server
 fi
 
+log "Give main application container a few seconds to start before collecting logs..."
+sleep 10
+
+APP_CID=$(docker ps -q -f "ancestor=aapp-image" | head -n1)
+if [[ -n $APP_CID ]]; then
+  log "Dumping last 200 lines from aapp-image container logs ($APP_CID)..."
+  docker logs --tail 200 "$APP_CID" 2>&1 | tee -a "$LOG_FILE"
+else
+  log "No running container found for image 'aapp-image' to dump logs from."
+fi
+
 log "Bootstrap script completed successfully."
