@@ -193,7 +193,7 @@ fi
 log "Give main application container ten minutes to start before collecting logs..."
 sleep 600
 
-APP_CID=$(docker ps -q -f "ancestor=aapp-image" | head -n1)
+APP_CID=$(docker ps -aq -f "ancestor=aapp-image" | head -n1)
 if [[ -n $APP_CID ]]; then
   log "Dumping last 2000 lines from aapp-image container logs ($APP_CID)..."
   docker logs --tail 2000 "$APP_CID" 2>&1 | tee -a "$LOG_FILE"
