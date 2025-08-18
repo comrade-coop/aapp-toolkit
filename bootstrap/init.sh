@@ -194,10 +194,14 @@ log "Give main application container time to start before collecting logs..."
 sleep 300
 
 if [[ -n "$APP_CID" ]]; then
+  STATUS=$(docker inspect -f '{{.State.Status}}' "$APP_CID" 2>/dev/null || echo "unknown")
+  log "Container $APP_CID status: $STATUS"
   log "Dumping last 2000 lines from aapp-image container logs ($APP_CID)..."
   docker logs --tail 2000 "$APP_CID" 2>&1 | tee -a "$LOG_FILE"
 else
   log "No containers found for image 'aapp-image' to dump logs from."
+  log "Dumping output of 'docker ps -a' for debugging..."
+  docker ps -a 2>&1 | tee -a "$LOG_FILE"
 fi
 
 if [[ -n $CLOUD_MOUNT_HOST_DIR ]]; then
