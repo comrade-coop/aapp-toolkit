@@ -182,23 +182,28 @@ if [[ -n $BOOTSTRAPPING_PARENT ]]; then
 fi
 
 log "Starting main application container..."
-docker run -d -p 3000:$AAPPPORT $MOUNT_OPTS --restart=always aapp-image
+APP_CID=$(docker run -d -p 3000:$AAPPPORT $MOUNT_OPTS --restart=always aapp-image 2>/tmp/aapp-run.err || true)
+if [[ -z "$APP_CID" ]]; then
+  log "docker run failed — printing error output:"
+  cat /tmp/aapp-run.err | tee -a "$LOG_FILE"
+else
+  log "Main app container started: $APP_CID"
+fi
+
+log "Give main application container time to start before collecting logs..."
+sleep 300
+
+if [[ -n "$APP_CID" ]]; then
+  log "Dumping last 2000 lines from aapp-image container logs ($APP_CID)..."
+  docker logs --tail 2000 "$APP_CID" 2>&1 | tee -a "$LOG_FILE"
+else
+  log "No containers found for image 'aapp-image' to dump logs from."
+fi
 
 if [[ -n $CLOUD_MOUNT_HOST_DIR ]]; then
   log "Starting cloud volume server..."
   docker build -t aapp-toolkit-server .
   docker run -d -p 54321:54321 -e ALLOWED_PATTERN=$ALLOWED_PATTERN -v $CLOUD_MOUNT_HOST_DIR:/cloud-app-volume --restart=always aapp-toolkit-server
-fi
-
-log "Give main application container ten minutes to start before collecting logs..."
-sleep 600
-
-APP_CID=$(docker ps -aq -f "ancestor=aapp-image" | head -n1)
-if [[ -n $APP_CID ]]; then
-  log "Dumping last 2000 lines from aapp-image container logs ($APP_CID)..."
-  docker logs --tail 2000 "$APP_CID" 2>&1 | tee -a "$LOG_FILE"
-else
-  log "No running container found for image 'aapp-image' to dump logs from."
 fi
 
 log "Bootstrap script completed successfully."
