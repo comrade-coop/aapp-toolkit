@@ -147,6 +147,14 @@ apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker
 systemctl start docker
 systemctl enable docker
 
+log "Add 16G swap..."
+sudo fallocate -l 16G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+free -h; swapon --show
+
 log "Building Docker image..."
 docker build $BUILD_ARGS -f $AAPPDOCKERFILE -t aapp-image .
 
