@@ -212,12 +212,7 @@ if [[ -n "$APP_CID" ]]; then
   [[ -n "$ERROR_MSG" ]] && log "Container error: $ERROR_MSG"
 
   log "Dumping full logs for aapp-image container ($APP_CID)..."
-  set -o pipefail
-  docker logs --since=0s --timestamps --details "$APP_CID" 2>&1 | tee -a "$LOG_FILE"
-  LOGS_RC=${PIPESTATUS[0]}
-  set +o pipefail
-
-  log "docker logs exit code: $LOGS_RC"
+  docker logs $APP_CID 2>&1 | tee -a "$LOG_FILE"
 else
   log "No containers found for image 'aapp-image' to dump logs from."
   log "Dumping output of 'docker ps -a' for debugging..."
