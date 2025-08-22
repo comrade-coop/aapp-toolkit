@@ -203,9 +203,21 @@ sleep 300
 
 if [[ -n "$APP_CID" ]]; then
   STATUS=$(docker inspect -f '{{.State.Status}}' "$APP_CID" 2>/dev/null || echo "unknown")
-  log "Container $APP_CID status: $STATUS"
-  log "Dumping last 2000 lines from aapp-image container logs ($APP_CID)..."
-  docker logs --tail 2000 "$APP_CID" 2>&1 | tee -a "$LOG_FILE"
+  EXIT_CODE=$(docker inspect -f '{{.State.ExitCode}}' "$APP_CID" 2>/dev/null || echo "N/A")
+  OOM_KILLED=$(docker inspect -f '{{.State.OOMKilled}}' "$APP_CID" 2>/dev/null || echo "N/A")
+  FINISHED_AT=$(docker inspect -f '{{.State.FinishedAt}}' "$APP_CID" 2>/dev/null || echo "N/A")
+  ERROR_MSG=$(docker inspect -f '{{.State.Error}}' "$APP_CID" 2>/dev/null || true)
+
+  log "Container $APP_CID status: $STATUS exit_code=$EXIT_CODE oom_killed=$OOM_KILLED finished_at=$FINISHED_AT"
+  [[ -n "$ERROR_MSG" ]] && log "Container error: $ERROR_MSG"
+
+  log "Dumping full logs for aapp-image container ($APP_CID)..."
+  set -o pipefail
+  docker logs --since=0s --timestamps --details "$APP_CID" 2>&1 | tee -a "$LOG_FILE"
+  LOGS_RC=${PIPESTATUS[0]}
+  set +o pipefail
+
+  log "docker logs exit code: $LOGS_RC"
 else
   log "No containers found for image 'aapp-image' to dump logs from."
   log "Dumping output of 'docker ps -a' for debugging..."
